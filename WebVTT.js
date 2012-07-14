@@ -19,14 +19,14 @@ var WebVTT = (function(){
 	}
 	
 	function serialize(cue){
-		var text = cue.id+"\n"
+		var text = cue.id+"\r\n"
 			+VTTtime(cue.startTime)+" --> "+VTTtime(cue.endTime);
 		if(cue.vertical !== ''){ text+=" vertical:"+cue.vertical; }
 		if(cue.align !== 'middle'){ text+=" align:"+cue.align; }
 		if(cue.rawLine !== 'auto'){ text+=" line:"+cue.line; }
 		if(cue.size !== 100){ text+=" line:"+cue.size+"%"; }
 		if(cue.position !== 50){ text+=" position:"+cue.position+"%"; }
-		return text+"\n"+cue.text+"\n\n";
+		return text+"\r\n"+cue.text+"\r\n\r\n";
 	}
 	
 	function parse_timestamp(input){

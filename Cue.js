@@ -41,13 +41,15 @@ var Cue = (function(){
 			id: {value:id||''},
 			text: {
 				set: function(t){ return text = t.replace(/[\n\r]+/g,'\n');	},
-				get: function(){ return text; }
+				get: function(){ return text; },
+				enumerable: true
 			},
 			vertical: {
 				set: function(value){
 					return dir = (	value === 'rl' ||
 									value === 'lr'	)?value:'';
-				},get: function(){return dir;}
+				},get: function(){return dir;},
+				enumerable: true
 			},
 			align: {
 				set: function(value){
@@ -55,7 +57,8 @@ var Cue = (function(){
 						value==='middle' ||
 						value==='end'){ return align=value; }
 					throw new Error("Invalid value for align attribute.");
-				},get: function(){return align;}
+				},get: function(){return align;},
+				enumerable: true
 			},
 			line: {
 				set: function(value){
@@ -73,28 +76,33 @@ var Cue = (function(){
 							return value;
 						}
 						throw new Error("Invalid value for line attribute.");
-				},get: function(){return snap?line:(line+"%");}
+				},get: function(){return snap?line:(line+"%");},
+				enumerable: true
 			},
 			rawLine: {
 				set: function(value){
 					if(value === 'auto'){ return line = 'auto'; }
 					value = +value;
 					return line = snap?value:(value>100?100:(value<0?0:value));
-				},get: function(){ return line; }
+				},get: function(){ return line; },
+				enumerable: true
 			},
 			snapToLines: {
 				set: function(value){ return snap = !!value; },
-				get: function(){ return snap; }
+				get: function(){ return snap; },
+				enumerable: true
 			},
 			size: {
 				set: function(value){
 					return size = validate_percentage(value);
-				},get: function(){return size;}
+				},get: function(){return size;},
+				enumerable: true
 			},
 			position: {
 				set: function(value){
 					return position = validate_percentage(value);
-				},get: function(){return position;}
+				},get: function(){return position;},
+				enumerable: true
 			}
 		});
 		
