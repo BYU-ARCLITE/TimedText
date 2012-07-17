@@ -34,11 +34,11 @@ var Cue = (function(){
 		
 		this.startTime = +startTime||0;
 		this.endTime = +endTime||0;
+		this.id = id||'';
 		
 		text = text.replace(/[\n\r]+/g,'\n');
 		
 		Object.defineProperties(this,{
-			id: {value:id||''},
 			text: {
 				set: function(t){ return text = t.replace(/[\n\r]+/g,'\n');	},
 				get: function(){ return text; },
