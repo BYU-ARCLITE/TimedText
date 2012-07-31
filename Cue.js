@@ -1,6 +1,9 @@
 //http://html5-demos.appspot.com/static/whats-new-with-html5-media/template/index.html#14 TextTrackCue
-var Cue = (function(){
+(function(){
 	"use strict";
+	
+	if(!TimedText){ throw new Error("TimedText not defined."); }
+	
 	var set_pat = /(align|vertical|line|size|position):(\S+)/g,
 		time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*(.*)/;
 
@@ -109,5 +112,5 @@ var Cue = (function(){
 		if(settings){parse_settings(this,settings);}
 	}
 	
-	return Cue;
+	TimedText.Cue = Cue;
 }());

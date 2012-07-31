@@ -1,5 +1,8 @@
-var SRT = (function(){
+(function(){
 	"use strict";
+	
+	if(!TimedText){ throw new Error("TimedText not defined."); }
+	
 	function SRTtime(time){
 		var seconds = Math.floor(time),
 			minutes = Math.floor(seconds/60),
@@ -19,9 +22,106 @@ var SRT = (function(){
 			+SRTtime(cue.startTime)+" --> "+SRTtime(cue.endTime)
 			+"\n"+cue.text+"\n\n";
 	}
+	
+	var time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d\,\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d\,\d{3})\s*/;
+
+	function parse_timestamp(input){
+		var ret,p,fields;
+		if(input[0]===':'){throw new SyntaxError("Unexpected Colon");}
+		fields = input.split(/[:,]/);
+		if(fields.length===4){
+			ret = parseInt(fields[0],10)*3600+parseInt(fields[3],10)/1000;
+			p = 1;
+		}else{
+			ret = parseInt(fields[2],10)/1000;
+			p = 0;
+		}
+		return ret + parseInt(fields[p],10)*60 + parseInt(fields[++p],10);
+	}
+	
+	function add_cue(p,input,id,fields,cue_list){
+		var s, l, len=input.length;
+		get_text: {
+			if(	(input[p] === '\r') && //Skip CR
+				(++p === len)	){break get_text;}
+			if(	(input[p] === '\n')	&& //Skip LF
+				(++p === len)	){break get_text;}
+			s = p;
+			do{	//Cue text loop:
+				l=p; //Collect a sequence of characters that are not CR or LF characters.
+				while(p < len && input[p] !== '\r' && input[p] !== '\n'){p++;}
+				if(l===p){break;} //terminate on an empty line
+				if(	(input[p] === '\r') && //Skip CR
+					(++p === len)	){break;}
+				if(input[p] === '\n'){ ++p; } //Skip LF
+			}while(p < len); 
+		}
+		cue_list.push(
+			new TimedText.Cue(id,
+				parse_timestamp(fields[1]), //startTime
+				parse_timestamp(fields[2]), //endTime
+				//Replace all U+0000 NULL characters in input by U+FFFD REPLACEMENT CHARACTERs.
+				input.substring(s,p).replace('\0','\uFFFD')
+			));
+		return p;
+	}
+	function parse(input){
+		var line,l,p,id=0,
+			cue_list = [],
+			len = input.length;
+
+		//If the first character is a BYTE ORDER MARK, skip it.
+		p = +(input[0] === '\uFEFF');
 		
-	return {
-		parse: function(){ throw new Error("SRT Parsing Not Implemented"); },
+		function crlf(){
+			if(	(input[p] === '\r') && //Skip CR
+				(++p === len)	){throw 0;}
+			if(	(input[p] === '\n')	&& //Skip LF
+				(++p === len)	){throw 0;}
+		}
+		
+		function collect_line(){
+			l=p; //Collect a sequence of characters that are not CR or LF characters.
+			while(input[p]!=='\r' && input[p] !=='\n'){
+				if(++p === len){throw 0;}
+			}
+		}
+		
+		try {
+			cue_loop: do{
+				/**Skip the number line**/
+				//Skip CR & LF characters.
+				while(input[p]==='\r' || input[p]==='\n'){
+					if(++p === len){break cue_loop;}
+				}
+				collect_line();
+				/**Get the timecode line**/
+				//Skip CR & LF characters.
+				while(input[p]==='\r' || input[p]==='\n'){
+					if(++p === len){break cue_loop;}
+				}
+				collect_line();
+				line = input.substring(l,p);
+				if(line.indexOf('-->')===-1){
+					continue cue_loop;
+				}
+				
+				//Collect SRT cue timings
+				if(fields = time_pat.exec(line)){
+					p = add_cue(p,input,++id,fields,cue_list);
+				}else{ //Bad cue loop:
+					do{	crlf();
+						collect_line();
+					}while(l!==p); //Look for a blank line to terminate
+				}
+			}while(p < len);
+		}finally{//End: The file has ended. The SRT parser has finished.
+			return cue_list;
+		}
+	}
+		
+	TimedText.SRT = {
+		parse: parse,
 		serialize: serialize
 	};
 }());

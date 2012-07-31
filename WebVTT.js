@@ -1,8 +1,11 @@
 /*
 http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 */
-var WebVTT = (function(){
+(function(){
 	"use strict";
+	
+	if(!TimedText){ throw new Error("TimedText not defined."); }
+	
 	var set_pat = /(align|vertical|line|size|position):(\S+)/g,
 		time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*(.*)/;
 
@@ -63,7 +66,7 @@ var WebVTT = (function(){
 		//Cue text processing:
 		//This where we ought to construct the cue-text DOM
 		cue_list.push(
-			new Cue(id,
+			new TimedText.Cue(id,
 					parse_timestamp(fields[1]), //startTime
 					parse_timestamp(fields[2]), //endTime
 					//Replace all U+0000 NULL characters in input by U+FFFD REPLACEMENT CHARACTERs.
@@ -153,7 +156,7 @@ var WebVTT = (function(){
 		return parse_cues(input,p);
 	}	
 	
-	return {
+	TimedText.WebVTT = {
 		parse: parse,
 		serialize: serialize
 	};
