@@ -119,9 +119,13 @@
 			return cue_list;
 		}
 	}
-		
-	TimedText.SRT = {
-		parse: parse,
-		serialize: serialize
+	
+	TimedText.mime_types['text/srt'] = {
+		parseFile: parse,
+		serializeTrack: function(data){
+			if(!(data instanceof Array)){ data = data.cues; }
+			return data.map(function(cue){ serialize(cue); }).join('');
+		},
+		serializeCue: serialize
 	};
 }());

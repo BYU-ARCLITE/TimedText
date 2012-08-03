@@ -5,7 +5,8 @@
 	if(!TimedText){ throw new Error("TimedText not defined."); }
 	
 	var set_pat = /(align|vertical|line|size|position):(\S+)/g,
-		time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*(.*)/;
+		time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*(.*)/,
+		cueId = 0;
 
 	function validate_percentage(value){
 		var number;
@@ -38,6 +39,7 @@
 		this.startTime = +startTime||0;
 		this.endTime = +endTime||0;
 		this.id = id||'';
+		this.uid = (cueId++).toString(36);
 		
 		text = text.replace(/[\n\r]+/g,'\n');
 		

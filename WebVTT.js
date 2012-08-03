@@ -156,8 +156,12 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		return parse_cues(input,p);
 	}	
 	
-	TimedText.WebVTT = {
-		parse: parse,
-		serialize: serialize
+	TimedText.mime_types['text/vtt'] = {
+		parseFile: parse,
+		serializeTrack: function(data){
+			if(!(data instanceof Array)){ data = data.cues; }
+			return "WEBVTT\r\n\r\n"+data.map(function(cue){ return serialize(cue); }).join('');;
+		},
+		serializeCue: serialize
 	};
 }());

@@ -36,6 +36,16 @@
 		return parseHTML(text);
 	}
 	
+	var mimeexp = /([^\s()<>\[\]@,;:"\/\\?.=]+\/[^\s()<>\[\]@,;:"\/\\?.=]+)(;.*)?/;                       
+	
+	function dispatch(method, mime, data){
+		var match = mimeexp.exec(mime);
+		if(!match){ throw new Error("Invalid Mime-Type"); }
+		mime = match[1];
+		if(!global.TimedText.mime_types.hasOwnProperty(mime)){ throw new Error('Unsupported File Type'); }
+		return global.TimedText.mime_types[mime][method](data);
+	}
+	
 	if(!global.TimedText){
 		//create a preview of the cue content
 		previewers = {
@@ -66,11 +76,15 @@
 			chapters:		parseTitle,
 			metadata:		function(text){return text;}
 		};
-	
+		
 		global.TimedText = {
-			validators:validators,
-			previewers:previewers,
-			parsers:parsers
+			textValidators:validators,
+			textPreviewers:previewers,
+			textParsers:parsers,
+			mime_types: {},
+			parseFile: dispatch.bind(null,'parseFile'),
+			serializeTrack: dispatch.bind(null,'serializeTrack'),
+			serializeCue: dispatch.bind(null,'serializeCue')
 		};
 	}
 }(window));
