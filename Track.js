@@ -7,6 +7,7 @@
 		var time = 0,
 			mode = "showing",
 			currentCues = cues.filter(function(cue){ return cue.startTime <= 0 && cue.endTime >= 0; });
+		cues.sort(function(a,b){return (a.startTime - b.startTime) || (b.endTime - a.endTime);});
 		this.cues = cues;
 		this.lang = lang;
 		this.label = label;
@@ -66,8 +67,10 @@
 									this.emit('show',currentCues);
 								}
 							}
+							mode = nmode;
 						}
 					}
+					return mode;
 				},enumerable: true
 			},
 			update: {
