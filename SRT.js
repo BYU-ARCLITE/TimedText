@@ -66,7 +66,7 @@
 		return p;
 	}
 	function parse(input){
-		var line,l,p,id=0,
+		var line,fields,l,p,id=0,
 			cue_list = [],
 			len = input.length;
 
@@ -124,7 +124,7 @@
 		parseFile: parse,
 		serializeTrack: function(data){
 			if(!(data instanceof Array)){ data = data.cues; }
-			return data.map(function(cue){ serialize(cue); }).join('');
+			return data.map(function(cue){ return serialize(cue); }).join('');
 		},
 		serializeCue: serialize
 	};
