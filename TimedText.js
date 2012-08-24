@@ -3,8 +3,9 @@
 	var validators,
 		previewers,
 		parsers,
-		t_el = document.createElement('span');
-		
+		t_el = document.createElement('span'),
+		mimeexp = /([^\s()<>\[\]@,;:"\/\\?.=]+\/[^\s()<>\[\]@,;:"\/\\?.=]+)(;.*)?/;
+
 	function stripHTML(text){
 		t_el.innerHTML = text;
 		return t_el.innerText || t_el.textContent || "";
@@ -15,7 +16,7 @@
 	function stripTitleMarkup(text){
 		return stripHTML(text);
 	}
-	
+
 	function validateHTML(text){
 		return true;
 	}
@@ -35,17 +36,27 @@
 	function parseTitle(text){
 		return parseHTML(text);
 	}
-	
-	var mimeexp = /([^\s()<>\[\]@,;:"\/\\?.=]+\/[^\s()<>\[\]@,;:"\/\\?.=]+)(;.*)?/;                       
-	
-	function dispatch(method, mime, data){
+
+	function strip_mime(mime){
 		var match = mimeexp.exec(mime);
 		if(!match){ throw new Error("Invalid Mime-Type"); }
-		mime = match[1];
-		if(!global.TimedText.mime_types.hasOwnProperty(mime)){ throw new Error('Unsupported File Type'); }
-		return global.TimedText.mime_types[mime][method](data);
+		return match[1];
+	}
+
+	function assert_support(mime){
+		mime = strip_mime(mime);
+		if(!global.TimedText.mime_types.hasOwnProperty(mime)){ throw new Error('Unsupported Mime-Type'); }
+		return mime;
 	}
 	
+	function getExt(mime){
+		return global.TimedText.mime_types[assert_support(mime)].extension;
+	}
+	
+	function dispatch(method, mime, data){
+		return global.TimedText.mime_types[assert_support(mime)][method](data);
+	}
+
 	if(!global.TimedText){
 		//create a preview of the cue content
 		previewers = {
@@ -56,7 +67,7 @@
 			chapters:		stripTitleMarkup,
 			metadata:		function(){return "<data>";}
 		};
-		
+
 		//ensure the cue content has the right form for the track type
 		validators = {
 			html:			validateHTML,
@@ -66,7 +77,7 @@
 			chapters:		validateTitle,
 			metadata:		function(){return true;}
 		};
-		
+
 		//turn cue content into an HTML string, unless it's metadata
 		parsers = {
 			html:			parseHTML,
@@ -76,7 +87,7 @@
 			chapters:		parseTitle,
 			metadata:		function(text){return text;}
 		};
-		
+
 		global.TimedText = {
 			textValidators:validators,
 			textPreviewers:previewers,
@@ -84,7 +95,20 @@
 			mime_types: {},
 			parseFile: dispatch.bind(null,'parseFile'),
 			serializeTrack: dispatch.bind(null,'serializeTrack'),
-			serializeCue: dispatch.bind(null,'serializeCue')
+			serializeCue: dispatch.bind(null,'serializeCue'),
+			isSupported: function(mime){ return global.TimedText.hasOwnProperty(strip_mime(mime)); },
+			checkType: assert_support,
+			getExt: getExt,
+			addExt: function(mime,name){
+				var suffix = getExt(mime);
+				return (name.substr(name.length-suffix.length).toLowerCase() === suffix)?
+					name:name+'.'+suffix;
+			},
+			removeExt: function(mime,name){					
+				var suffix = '.'+getExt(mime),
+					len = name.length-suffix.length;
+				return (name.substr(len).toLowerCase() === suffix)?name.substr(0,len):name;
+			}
 		};
 	}
 }(window));

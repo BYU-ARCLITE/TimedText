@@ -157,6 +157,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	}	
 	
 	TimedText.mime_types['text/vtt'] = {
+		extension: 'vtt',
 		parseFile: parse,
 		serializeTrack: function(data){
 			if(!(data instanceof Array)){ data = data.cues; }

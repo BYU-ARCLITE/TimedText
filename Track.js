@@ -36,7 +36,9 @@
 								return cue.startTime <= time && cue.endTime >= time;
 							});
 							Array.prototype.push.apply(activeCues,valid);
-							this.emit('cues',{ valid: valid, invalid: invalid });
+							if(valid.length || invalid.length){
+								this.emit('cues',{ valid: valid, invalid: invalid });
+							}
 						}
 					}
 					return time;
@@ -116,6 +118,50 @@
 			this.emit('cues',{invalid: [cue], valid: []});
 		}
 	};
-		
+	
+	Track.get = function(params){ //url|file, kind, lang, name
+		var source, reader, mime;
+		if(params.file instanceof File){
+			source = params.file;
+			mime = source.type;
+			reader = new FileReader();
+			reader.onload = function(evt) {
+				params.success(new Track(
+					TimedText.parseFile(mime, evt.target.result),
+					params.kind,
+					TimedText.removeExt(mime, typeof params.name === 'string'?params.name:source.name),
+					params.lang
+				));
+			};
+			reader.onerror =	(typeof params.error === 'function')?
+								params.error:
+								function(e){alert(e.message);};
+			reader.readAsText(source);
+		}else{
+			source = params.url;
+			reader = new XMLHttpRequest();
+			reader.onreadystatechange = function(){
+				if(this.readyState==4){
+					if(this.status>=200 && this.status<400){
+						mime = this.getResponseHeader('content-type')
+						params.success(new Track(
+							TimedText.parseFile(mime, this.responseText),
+							params.kind,
+							TimedText.removeExt(mime,	typeof params.name === 'string'
+														?params.name
+														:source.substr(source.lastIndexOf('/'))
+							), params.lang
+						));
+					}else{
+						if(typeof params.error === 'function'){ params.error(this); }
+						else{ alert("The track could not be loaded: " + this.responseText); }
+					}
+				}
+			};
+			reader.open("GET",source,true);
+			reader.send();
+		}
+	};
+	
 	TimedText.Track = Track;
 }());

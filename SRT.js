@@ -121,6 +121,7 @@
 	}
 	
 	TimedText.mime_types['text/srt'] = {
+		extension: 'srt',
 		parseFile: parse,
 		serializeTrack: function(data){
 			if(!(data instanceof Array)){ data = data.cues; }
