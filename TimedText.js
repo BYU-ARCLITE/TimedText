@@ -53,6 +53,15 @@
 		return global.TimedText.mime_types[assert_support(mime)].extension;
 	}
 	
+	function inferMime(name){
+		var mime, ext, mime_table = global.TimedText.mime_types;
+		for(mime in mime_table){
+			ext = mime_table[mime].extension;
+			if(name.substr(name.length-ext.length) === ext){ return mime; }
+		}
+		return "";
+	}
+	
 	function dispatch(method, mime, data){
 		return global.TimedText.mime_types[assert_support(mime)][method](data);
 	}
@@ -96,8 +105,9 @@
 			parseFile: dispatch.bind(null,'parseFile'),
 			serializeTrack: dispatch.bind(null,'serializeTrack'),
 			serializeCue: dispatch.bind(null,'serializeCue'),
-			isSupported: function(mime){ return global.TimedText.hasOwnProperty(strip_mime(mime)); },
+			isSupported: function(mime){ return this.mime_types.hasOwnProperty(strip_mime(mime)); },
 			checkType: assert_support,
+			inferType: inferMime,
 			getExt: getExt,
 			addExt: function(mime,name){
 				var suffix = getExt(mime);

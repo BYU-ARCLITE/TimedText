@@ -123,7 +123,7 @@
 		var source, reader, mime;
 		if(params.file instanceof File){
 			source = params.file;
-			mime = source.type;
+			mime = source.type || TimedText.inferType(source.name);
 			reader = new FileReader();
 			reader.onload = function(evt) {
 				params.success(new Track(
@@ -143,7 +143,7 @@
 			reader.onreadystatechange = function(){
 				if(this.readyState==4){
 					if(this.status>=200 && this.status<400){
-						mime = this.getResponseHeader('content-type')
+						mime = this.getResponseHeader('content-type');
 						params.success(new Track(
 							TimedText.parseFile(mime, this.responseText),
 							params.kind,

@@ -23,12 +23,12 @@
 			+"\n"+cue.text+"\n\n";
 	}
 	
-	var time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d\,\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d\,\d{3})\s*/;
+	var time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*/;
 
 	function parse_timestamp(input){
 		var ret,p,fields;
 		if(input[0]===':'){throw new SyntaxError("Unexpected Colon");}
-		fields = input.split(/[:,]/);
+		fields = input.split(/[:,.]/);
 		if(fields.length===4){
 			ret = parseInt(fields[0],10)*3600+parseInt(fields[3],10)/1000;
 			p = 1;
