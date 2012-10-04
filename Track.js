@@ -163,5 +163,21 @@
 		}
 	};
 	
+	Track.parse = function(params){ //content, mime, kind, lang, name
+		var name = params.name,
+			mime = params.mime || TimedText.inferType(name);
+		try{
+			params.success(new Track(
+				TimedText.parseFile(mime, params.content),
+				params.kind,
+				TimedText.removeExt(mime, name),
+				params.lang
+			));
+		}catch(e){
+			if(typeof params.error === 'function'){ params.error(e); }
+			else{ alert("The track could not be loaded: " + e.message); }
+		}
+	};
+	
 	TimedText.Track = Track;
 }());
