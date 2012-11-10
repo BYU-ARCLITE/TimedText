@@ -47,7 +47,7 @@
 			mode: {
 				get: function(){ return mode; },
 				set: function(val){
-					var nmode, match = /showing|disabled|hidden/.exec(""+val);
+					var nmode, match = /^(showing|disabled|hidden)$/.exec(""+val);
 					if(match){
 						nmode = match[0];
 						if(nmode != mode){
@@ -129,7 +129,7 @@
 				params.success(new Track(
 					TimedText.parseFile(mime, evt.target.result),
 					params.kind,
-					TimedText.removeExt(mime, typeof params.name === 'string'?params.name:source.name),
+					typeof params.name === 'string'?params.name:TimedText.removeExt(mime, source.name),
 					params.lang
 				));
 			};
@@ -147,10 +147,8 @@
 						params.success(new Track(
 							TimedText.parseFile(mime, this.responseText),
 							params.kind,
-							TimedText.removeExt(mime,	typeof params.name === 'string'
-														?params.name
-														:source.substr(source.lastIndexOf('/'))
-							), params.lang
+							typeof params.name === 'string'?params.name:TimedText.removeExt(mime, source.substr(source.lastIndexOf('/'))),
+							params.lang
 						));
 					}else{
 						if(typeof params.error === 'function'){ params.error(this); }
