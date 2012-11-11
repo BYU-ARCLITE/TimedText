@@ -4,121 +4,90 @@ var TextTrackCue = (function(){
 		set_pat = /(align|vertical|line|size|position):(\S+)/g,
 		time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*(.*)/,
 		cueId = 0;
-		
-	function processLayer(layerObject,undefined) {
-		var fragment = document.createDocumentFragment();
-		layerObject.map(function(cueChunk){
-			var node, n2;
-			// Don't generate text from the token if it has no contents
-			if (cueChunk.children && cueChunk.children.length) {
-				if (cueChunk.token === 'v') {
-					node = document.createElement('q');
-					node.className = "voice";
-					node.dataset.voice = cueChunk.voice;
-				} else {
-					node = document.createElement('span');
-					if(cueChunk.token === "c"){
-						node.className = cueChunk.classes;
-					} else if(cueChunk.timeIn > 0) {
-						node.dataset.timestamp = cueChunk.timeIn;
-					} else {
-						node.innerHTML = cueChunk.rawToken + '</' + cueChunk.token + '>';
-						node = node.firstChild;
-					}
-				}
-				node.appendChild(processLayer(cueChunk.children));
-			} else {
-				node = document.createTextNode(cueChunk);
-			}
-			return node;
-		}).forEach(function(node){ fragment.appendChild(node); });			
-		return fragment;
+	
+	//http://dev.w3.org/html5/webvtt/#webvtt-cue-text-dom-construction-rules
+	function createTimestampNode(timeData){
+		var node,
+			hh = parseInt(timeData[1],10)|| 0,
+			mm = parseInt(timeData[2],10) || 0,
+			ss = parseInt(timeData[3],10) || 0,
+			ms = parseFloat("0."+timeData[4]),
+			seconds = hh*3600+mm*60+ss+ms, timestamp;
+		ms *= 1000;
+		timestamp = (hh>9?hh:"0"+hh)+":" +
+					(mm>9?mm:"0"+mm)+":" +
+					(ss>9?ss:"0"+ss)+"." +
+					(ms>99?ms:(ms>9?"0"+ms:"00"+ms));
+		try{
+			node = document.createProcessingInstruction('timestamp',timestamp);
+		}catch(e){
+			node = document.createElement('i');
+			node.dataset.target = "timestamp";
+			node.dataset.timestamp = timestamp;
+		}
+		node.dataset.seconds = seconds;
+		return node;
 	}
-		
+	
 	function hasRealTextContent(textInput) {
 		return !!textInput.replace(/[^a-z0-9]+/ig,"").length;
 	}
 	
 	function processCaptionHTML(inputHTML,sanitize) {
-		var cueStructure = [],
-			currentContext = cueStructure,
-			stack = [];
+		var DOM = document.createDocumentFragment(),
+			current = DOM,
+			stack = [],
+			lang = "";
 		
-		// Process out special cue spans
 		inputHTML
 			.split(/(<\/?[^>]+>)/ig)
 			.filter(function(cuePortionText) {
 				return !!cuePortionText.replace(/\s*/ig,"");
-			}).forEach(function(currentToken,splitIndex) {
-			var TagName, tmpObject,
-				stackIndex, stackScanDepth, parentContext,
-				chunkTimestamp, timeData;
+			}).forEach(function(token) {
+			var tag, chunk, node;
 				
-			if (currentToken[0] === "<") {
-				if (currentToken[1] === "/") {
-					// Closing tag
-					TagName = currentToken.match(/<\/([^\s>]+)/)[1];
-					if (stack.length > 0) {
-						// Scan backwards through the stack to determine whether we've got an open tag somewhere to close.
-						stackScanDepth = 0;
-						for (stackIndex = stack.length-1; stackIndex >= 0; stackIndex --) {
-							parentContext = stack[stackIndex][stack[stackIndex].length-1];
-							stackScanDepth = stackIndex;
-							if (parentContext.token === TagName) { break; }
-						}
-					
-						currentContext = stack[stackScanDepth];
-						stack = stack.slice(0,stackScanDepth);
-					} else {
-						// Tag mismatch!
-					}
-				} else {
-					// Opening Tag
-					// Check whether the tag is valid according to the WebVTT specification
-					// If not, don't allow it (unless the sanitiseCueHTML option is explicitly set to false)
-				
-					if (sanitize
-							|| currentToken.match(/^<(\d{2})?:?(\d{2}):(\d{2})[\.\,](\d+)/)
-							|| currentToken.match(/^<v\s+[^>]+>/i)
-							|| currentToken.match(/^<c[a-z0-9\-\_\.]+>/)
-							|| currentToken.match(/^<(b|i|u|ruby|rt)>/)
-						) {
-						tmpObject = (function(obj){
-							if (currentToken[1] === "v") {
-								obj.voice = currentToken.match(/^<v\s*([^>]+)>/i)[1].replace(/[\"]/g,"");
-							} else if (currentToken[1] === "c") {
-								obj.classes = currentToken
-												.replace(/[<\/>\s]+/ig,"")
-												.split(/[\.]+/ig)
-												.slice(1)
-												.filter(hasRealTextContent).join(' ');
-							} else if (!!(chunkTimestamp = currentToken.match(/(\d{2})?:?(\d{2}):(\d{2})[\.\,](\d+)/))) {
-								timeData = chunkTimestamp.slice(1);
-								obj.timeIn =	parseInt((timeData[0]||0) * 60 * 60,10) +	// Hours
-												parseInt((timeData[1]||0) * 60,10) +		// Minutes
-												parseInt((timeData[2]||0),10) +				// Seconds
-												parseFloat("0." + (timeData[3]||0));		// MS
-							}
-							return obj;
-						}({token: currentToken.replace(/[<\/>]+/ig,"").split(/[\s\.]+/)[0], rawToken: currentToken, children: []}));
-						
-						currentContext.push(tmpObject);
-						stack.push(currentContext);
-						currentContext = tmpObject.children;
-					}
+			if (token[0] !== "<") { // Text string
+				node = document.createElement('span');
+				node.textContent = token;
+				current.appendChild(node);
+			}else if (token[1] === "/") { //Closing tag
+				tag = token.match(/<\/([^\s>]+)/)[1].toUpperCase();
+				if(tag === current.nodeName || tag === current.dataset.cuetag){
+					if(tag === 'LANG'){ lang = stack.pop(); }
+					current = current.parentNode;
+					if(tag === 'RUBY'){ current = current.parentNode; }
 				}
-			} else {
-				// Text string
-				currentContext.push(sanitize?currentToken.replace(/</g,"&lt;")
-									.replace(/>/g,"&gt;")
-									.replace(/\&/g,"&amp;"):currentToken);
+				// else tag mismatch; ignore.
+			} else { //Opening tag
+				if(chunk = token.match(/<(\d{2})?:?(\d{2}):(\d{2})[\.\,](\d+)/)){
+					current.appendChild(createTimestampNode(chunk));
+					return;
+				}else if(chunk = token.match(/<v\s+([^>]+)>/i)){
+					node = document.createElement('span');
+					node.title = node.dataset.voice = chunk[1].replace(/[\"]/g,"");
+					node.dataset.cuetag = "V";
+				}else if(token.match(/<c[a-z0-9\-\_\.]+>/i)){
+					node = document.createElement('span');
+					node.className = token.replace(/[<\/>\s]+/ig,"")
+										.split(/[\.]+/ig)
+										.slice(1)
+										.filter(hasRealTextContent).join(' ');
+					node.dataset.cuetag = "C";
+				}else if(chunk = token.match(/<lang\s+([^>]+)>/i)){
+					node = document.createElement('span');
+					node.dataset.cuetag = "LANG";
+					stack.push(lang);
+					lang = chunk[1];
+				}else if(chunk = token.match(sanitize?/<(b|i|u|ruby|rt)>/:/<(\w+)>/)){
+					node = document.createElement(chunk[1]);
+				}
+				if(lang){ node.lang = lang; }
+				current.appendChild(node);
+				current = node;
 			}
 		});
-
-		return processLayer(cueStructure);
+		return DOM;
 	}
-		
-		
 		
 	function validate_percentage(value){
 		var number;
