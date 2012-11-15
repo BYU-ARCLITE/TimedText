@@ -11,21 +11,17 @@ var TextTrackCue = (function(){
 			hh = parseInt(timeData[1],10)|| 0,
 			mm = parseInt(timeData[2],10) || 0,
 			ss = parseInt(timeData[3],10) || 0,
-			ms = parseFloat("0."+timeData[4]),
-			seconds = hh*3600+mm*60+ss+ms, timestamp;
+			ms = parseFloat("0."+timeData[4]);
+			
+		node = document.createElement('i');
+		node.dataset.target = "timestamp";
+		node.dataset.seconds = hh*3600+mm*60+ss+ms;
+		
 		ms *= 1000;
-		timestamp = (hh>9?hh:"0"+hh)+":" +
+		node.dataset.timestamp = (hh>9?hh:"0"+hh)+":" +
 					(mm>9?mm:"0"+mm)+":" +
 					(ss>9?ss:"0"+ss)+"." +
 					(ms>99?ms:(ms>9?"0"+ms:"00"+ms));
-		try{
-			node = document.createProcessingInstruction('timestamp',timestamp);
-		}catch(e){
-			node = document.createElement('i');
-			node.dataset.target = "timestamp";
-			node.dataset.timestamp = timestamp;
-		}
-		node.dataset.seconds = seconds;
 		return node;
 	}
 	
