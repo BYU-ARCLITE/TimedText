@@ -29,7 +29,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		if(cue.rawLine !== 'auto'){ text+=" line:"+cue.line; }
 		if(cue.size !== 100){ text+=" line:"+cue.size+"%"; }
 		if(cue.position !== 50){ text+=" position:"+cue.position+"%"; }
-		return text+"\r\n"+cue.text+"\r\n\r\n";
+		return text+"\r\n"+cue.text+(cue.text[cue.text.length-1]==='\n'?"\r\n":"\r\n\r\n");
 	}
 	
 	function parse_timestamp(input){
@@ -47,7 +47,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	}
 	
 	function add_cue(p,input,id,fields,cue_list){
-		var s, l, len=input.length;
+		var s, l, e, len=input.length;
 		get_text: {
 			if(	(input[p] === '\r') && //Skip CR
 				(++p === len)	){break get_text;}
@@ -55,8 +55,9 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 				(++p === len)	){break get_text;}
 			s = p;
 			do{	//Cue text loop:
-				l=p; //Collect a sequence of characters that are not CR or LF characters.
+				l = p; //Collect a sequence of characters that are not CR or LF characters.
 				while(p < len && input[p] !== '\r' && input[p] !== '\n'){p++;}
+				e = p;
 				if(l===p){break;} //terminate on an empty line
 				if(	(input[p] === '\r') && //Skip CR
 					(++p === len)	){break;}
@@ -70,7 +71,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 					parse_timestamp(fields[1]), //startTime
 					parse_timestamp(fields[2]), //endTime
 					//Replace all U+0000 NULL characters in input by U+FFFD REPLACEMENT CHARACTERs.
-					input.substring(s,p).replace('\0','\uFFFD'),
+					input.substring(s,e).replace('\0','\uFFFD'),
 					fields[3] //settings
 			));
 		return p;

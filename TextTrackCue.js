@@ -47,15 +47,12 @@ var TextTrackCue = (function(){
 			var tag, chunk, node;
 				
 			if (token[0] !== "<") { // Text string
-				node = document.createElement('span');
-				node.textContent = token;
-				current.appendChild(node);
+				current.appendChild(document.createTextNode(token));
 			}else if (token[1] === "/") { //Closing tag
 				tag = token.match(/<\/([^\s>]+)/)[1].toUpperCase();
 				if(tag === current.nodeName || tag === current.dataset.cuetag){
 					if(tag === 'LANG'){ lang = stack.pop(); }
 					current = current.parentNode;
-					if(tag === 'RUBY'){ current = current.parentNode; }
 				}
 				// else tag mismatch; ignore.
 			} else { //Opening tag
@@ -183,7 +180,7 @@ var TextTrackCue = (function(){
 						track = this.track;
 					if (	!(track instanceof TextTrack)	||
 							track.readyState !== TextTrack.LOADED ||
-							!(track.mode === "showing" || track.mode === "hidden")
+							track.mode === "disabled"
 						){ return false; }
 					
 					currentTime = track.currentTime;
@@ -193,7 +190,6 @@ var TextTrackCue = (function(){
 							wasActive = true;
 							this.onenter();
 						}
-						return true;
 					}else if (wasActive) {
 						// Fire exit event if we were active and now are not
 						wasActive = false;
