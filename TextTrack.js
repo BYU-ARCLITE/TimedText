@@ -202,17 +202,18 @@ TextTrackCueList.prototype.getCueById = function(cueID) {
 	})[0];
 };
 TextTrackCueList.prototype.loadCues = function(cueData) {
-	for (var cueIndex = 0; cueIndex < cueData.length; cueIndex ++) {
-		cueData[cueIndex].track = this.track;
-		Array.prototype.push.call(this,cueData[cueIndex]);
-	}
+	var track = this.track;
+	[].forEach.call(cueData,function(cue){cue.track = track;});
+	[].push.apply(this,cueData);
+	this.sort(function(a,b){ return a.startTime < b.startTime ? -1 : 1; });
 };
 TextTrackCueList.prototype.addCue = function(cue) {
 	if (cue && cue instanceof TextTrackCue) {
+		if(this.indexOf(cue) !== -1){ return; }
 		if (cue.track === this.track || !cue.track) {
-			// TODO: Check whether cue is already in list of cues.
 			// TODO: Sort cue list based on TextTrackCue.startTime.
-			Array.prototype.push.call(this,cue);
+			this.push(cue);
+			this.sort(function(a,b){ return a.startTime < b.startTime ? -1 : 1; });
 		} else {
 			throw new Error("This cue is associated with a different track!");
 		}
@@ -237,7 +238,7 @@ function ActiveTextTrackCueList(textTrackCueList,textTrack) {
 	this.refreshCues = function() {
 		if (!textTrackCueList.length) { return; }
 		var cueList = this,
-			oldCueList = [].slice.call(this,0),
+			oldCueList = this.slice(0),
 			cueListChanged = false;
 			
 		this.length = 0;
