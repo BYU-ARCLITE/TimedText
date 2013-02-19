@@ -91,19 +91,11 @@ var TextTrack = (function(){
 	// mutableTextTrack.addCue(cue)
 	// Adds the given cue to mutableTextTrack's text track list of cues.
 	// Raises an exception if the argument is null, associated with another text track, or already in the list of cues.
-	TextTrack.prototype.addCue = function(cue) {
-		if (cue && cue instanceof TextTrackCue) {
-			this.cues.addCue(cue);
-		} else {
-			throw new Error("The argument is null or not an instance of TextTrackCue.");
-		}
-	};
+	TextTrack.prototype.addCue = function(cue) { this.cues.addCue(cue);	};
 	// mutableTextTrack.removeCue(cue)
 	// Removes the given cue from mutableTextTrack's text track list of cues.
 	// Raises an exception if the argument is null or not in the list of cues.
-	TextTrack.prototype.removeCue = function() {
-	
-	};
+	TextTrack.prototype.removeCue = function(cue) { this.cues.removeCue(cue); };
 	TextTrack.prototype.loadTrack = (function(){
 		function loadTrackReadyState(trackElement, callback, eventData) {
 			if (this.readyState === 4) {
@@ -172,7 +164,7 @@ var TextTrack = (function(){
 	
 	TextTrack.parse = function(params){ //content, mime, kind, label, lang
 		var track, name = params.label,
-			mime = typeof(params.mime) === "string"?params.mime:TimedText.inferType(name);
+			mime = (typeof(params.mime) === "string" && params.mime.length)?params.mime:TimedText.inferType(name);
 		try{
 			track = new TextTrack(
 				typeof(params.kind) === "string" ? params.kind : "",
@@ -180,7 +172,7 @@ var TextTrack = (function(){
 				typeof(params.lang) === "string" ? params.lang : ""
 			);
 			track.readyState = TextTrack.LOADED;
-			track.cues.loadCues(TimedText.parseFile(mime, evt.target.result));
+			track.cues.loadCues(TimedText.parseFile(mime, params.content));
 			track.activeCues.refreshCues.apply(track.activeCues);
 			(params.success instanceof Function) && params.success.call(track);
 		}catch(e){
@@ -203,22 +195,40 @@ TextTrackCueList.prototype.getCueById = function(cueID) {
 };
 TextTrackCueList.prototype.loadCues = function(cueData) {
 	var track = this.track;
-	[].forEach.call(cueData,function(cue){cue.track = track;});
+	cueData.forEach(function(cue){ cue.track = track; } );
 	[].push.apply(this,cueData);
-	this.sort(function(a,b){ return a.startTime < b.startTime ? -1 : 1; });
+	track.activeCues.refreshCues();
 };
 TextTrackCueList.prototype.addCue = function(cue) {
 	if (cue && cue instanceof TextTrackCue) {
-		if(this.indexOf(cue) !== -1){ return; }
 		if (cue.track === this.track || !cue.track) {
 			// TODO: Sort cue list based on TextTrackCue.startTime.
+			if(this.indexOf(cue) !== -1){ return; }
+			cue.track = this.track;
 			this.push(cue);
-			this.sort(function(a,b){ return a.startTime < b.startTime ? -1 : 1; });
+			if(cue.active){ this.track.activeCues.refreshCues(); }
 		} else {
 			throw new Error("This cue is associated with a different track!");
 		}
 	} else {
-		throw new Error("The argument is null or not an instance of TextTrackCue.");
+		throw new Error("The argument is not an instance of TextTrackCue.");
+	}
+};
+
+TextTrackCueList.prototype.removeCue = function(cue) {
+	var i;
+	if (cue && cue instanceof TextTrackCue) {
+		if (cue.track === this.track) {
+			i = this.indexOf(cue);
+			if(i === -1){ return; }
+			[].splice.call(this,i,1);
+			if(cue.active){ this.track.activeCues.refreshCues(); }
+			cue.track = null;
+		} else {
+			throw new Error("This cue is associated with a different track!");
+		}
+	} else {
+		throw new Error("The argument is not an instance of TextTrackCue.");
 	}
 };
 

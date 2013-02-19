@@ -3,7 +3,7 @@ var TextTrackCue = (function(){
 		allowedAlign = {'start':true,'middle':true,'end':true,'left':true,'right':true},
 		set_pat = /(align|vertical|line|size|position):(\S+)/g,
 		time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*(.*)/,
-		cueId = 0;
+		idCounter = 0;
 	
 	//http://dev.w3.org/html5/webvtt/#webvtt-cue-text-dom-construction-rules
 	function createTimestampNode(timeData){
@@ -40,13 +40,21 @@ var TextTrackCue = (function(){
 			.filter(function(cuePortionText) {
 				return !!cuePortionText.replace(/\s*/ig,"");
 			}).forEach(function(token) {
-			var tag, chunk, node;
-				
+			var tag, chunk, node, frags;
 			if (token[0] !== "<") { // Text string
-				current.appendChild(document.createTextNode(token));
+				if(sanitize){
+					frags = token.replace(/\n\r/g,'\n').split(/\n(?!$)/g);
+					frags.forEach(function(frag){
+						current.appendChild(document.createTextNode(frag));
+						current.appendChild(document.createElement('br'));
+					});
+					current.removeChild(current.lastChild);
+				}else{
+					current.appendChild(document.createTextNode(token));
+				}
 			}else if (token[1] === "/") { //Closing tag
 				tag = token.match(/<\/([^\s>]+)/)[1].toUpperCase();
-				if(tag === current.nodeName || tag === current.dataset.cuetag){
+				if(tag === current.nodeName || (current.dataset && tag === current.dataset.cuetag)){
 					if(tag === 'LANG'){ lang = stack.pop(); }
 					current = current.parentNode;
 				}
@@ -73,6 +81,8 @@ var TextTrackCue = (function(){
 					lang = chunk[1];
 				}else if(chunk = token.match(sanitize?/<(b|i|u|ruby|rt)>/:/<(\w+)>/)){
 					node = document.createElement(chunk[1]);
+				}else{
+					return;
 				}
 				if(lang){ node.lang = lang; }
 				current.appendChild(node);
@@ -110,6 +120,7 @@ var TextTrackCue = (function(){
 			align = "middle";
 		this.track = null;
 		this.id = "";
+		this.uid = (idCounter++).toString(36);
 		this.startTime = parseFloat(startTime);
 		this.endTime = parseFloat(endTime);
 		this.pauseOnExit = false;

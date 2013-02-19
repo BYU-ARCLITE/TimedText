@@ -6,8 +6,15 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	
 	if(!TimedText){ throw new Error("TimedText not defined."); }
 	
+	var WebVTTDEFAULTSCueParser		= /^DEFAULTS?\s+\-\-\>\s+(.*)/g;
+	var WebVTTSTYLECueParser		= /^STYLES?\s+\-\-\>\s*\n([\s\S]*)/g;
+	var WebVTTCOMMENTCueParser		= /^COMMENTS?\s+\-\-\>\s+(.*)/g;
+	
 	var set_pat = /(align|vertical|line|size|position):(\S+)/g,
-		time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*(.*)/;
+		ar_set_pat = /([DLTAS]):(\S+)/g,
+		ar_set_map = {"D":"direction","L":"line","T":"position","A":"align","S":"size"},
+		direction_map = {'horizontal':'','vertical-lr':'lr','vertical':'rl'},
+		time_pat = /^\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d\.\d{3})\s*(.*)/;
 
 	function VTTtime(time){
 		var seconds = Math.floor(time),
@@ -26,10 +33,10 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 			+VTTtime(cue.startTime)+" --> "+VTTtime(cue.endTime);
 		if(cue.vertical !== ''){ text+=" vertical:"+cue.vertical; }
 		if(cue.align !== 'middle'){ text+=" align:"+cue.align; }
-		if(cue.rawLine !== 'auto'){ text+=" line:"+cue.line; }
+		if(cue.line !== 'auto'){ text+=" line:"+cue.line; }
 		if(cue.size !== 100){ text+=" line:"+cue.size+"%"; }
 		if(cue.position !== 50){ text+=" position:"+cue.position+"%"; }
-		return text+"\r\n"+cue.text+(cue.text[cue.text.length-1]==='\n'?"\r\n":"\r\n\r\n");
+		return text+"\r\n"+cue.text.replace(/(\r?\n)+$/g,"")+"\r\n\r\n";
 	}
 	
 	function parse_timestamp(input){
@@ -46,8 +53,26 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		return ret + parseInt(fields[p],10)*60 + parseInt(fields[++p],10);
 	}
 	
+	function parse_settings(cue,line){
+		var fields, setting;
+		set_pat.lastIndex = 0;
+		while(!!(fields = set_pat.exec(line))){
+			cue[fields[1]] = fields[2];
+		}
+		//archaic settings;
+		ar_set_pat.lastIndex = 0;
+		while(!!(fields = ar_set_pat.exec(line))){
+			setting = ar_set_map[fields[1]];
+			if(setting === 'direction'){
+				cue.vertical = direction_map[fields[2]];
+			}else{
+				cue[setting] = fields[2];
+			}
+		}
+	}
+	
 	function add_cue(p,input,id,fields,cue_list){
-		var s, l, e, len=input.length;
+		var s, l, e, len=input.length, cue;
 		get_text: {
 			if(	(input[p] === '\r') && //Skip CR
 				(++p === len)	){break get_text;}
@@ -66,14 +91,15 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		}
 		//Cue text processing:
 		//This where we ought to construct the cue-text DOM
-		cue_list.push(
-			new TimedText.Cue(id,
+		cue = new TextTrackCue(
 					parse_timestamp(fields[1]), //startTime
 					parse_timestamp(fields[2]), //endTime
 					//Replace all U+0000 NULL characters in input by U+FFFD REPLACEMENT CHARACTERs.
-					input.substring(s,e).replace('\0','\uFFFD'),
-					fields[3] //settings
-			));
+					input.substring(s,p).replace('\0','\uFFFD')
+				);
+		cue.id = id;
+		parse_settings(cue,fields[3]);
+		cue_list.push(cue);
 		return p;
 	}
 	

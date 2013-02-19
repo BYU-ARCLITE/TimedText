@@ -40,7 +40,7 @@
 	}
 	
 	function add_cue(p,input,id,fields,cue_list){
-		var s, l, len=input.length;
+		var s, l, cue, len=input.length;
 		get_text: {
 			if(	(input[p] === '\r') && //Skip CR
 				(++p === len)	){break get_text;}
@@ -56,13 +56,14 @@
 				if(input[p] === '\n'){ ++p; } //Skip LF
 			}while(p < len); 
 		}
-		cue_list.push(
-			new TimedText.Cue(id,
+		cue = new TextTrackCue(
 				parse_timestamp(fields[1]), //startTime
 				parse_timestamp(fields[2]), //endTime
 				//Replace all U+0000 NULL characters in input by U+FFFD REPLACEMENT CHARACTERs.
 				input.substring(s,p).replace('\0','\uFFFD')
-			));
+			);
+		cue.id = id;
+		cue_list.push(cue);
 		return p;
 	}
 	function parse(input){
@@ -115,6 +116,8 @@
 					}while(l!==p); //Look for a blank line to terminate
 				}
 			}while(p < len);
+		}catch(e){
+			debugger;
 		}finally{//End: The file has ended. The SRT parser has finished.
 			return cue_list;
 		}
