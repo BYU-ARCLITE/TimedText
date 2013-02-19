@@ -20,7 +20,7 @@
 	function serialize(cue){
 		return (parseInt(cue.id,10)||"0")+"\n"
 			+SRTtime(cue.startTime)+" --> "+SRTtime(cue.endTime)
-			+"\n"+cue.text+"\n\n";
+			+"\n"+cue.text.replace(/(\r?\n)+$/g,"")+"\n\n";
 	}
 	
 	var time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*/;
@@ -60,7 +60,7 @@
 				parse_timestamp(fields[1]), //startTime
 				parse_timestamp(fields[2]), //endTime
 				//Replace all U+0000 NULL characters in input by U+FFFD REPLACEMENT CHARACTERs.
-				input.substring(s,p).replace('\0','\uFFFD')
+				input.substring(s,p).replace('\0','\uFFFD').replace(/(\r?\n)+$/g,"")
 			);
 		cue.id = id;
 		cue_list.push(cue);

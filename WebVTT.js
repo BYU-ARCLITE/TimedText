@@ -29,7 +29,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	}
 	
 	function serialize(cue){
-		var text = cue.id+"\r\n"
+		var text = (cue.id?cue.id+"\r\n":"")
 			+VTTtime(cue.startTime)+" --> "+VTTtime(cue.endTime);
 		if(cue.vertical !== ''){ text+=" vertical:"+cue.vertical; }
 		if(cue.align !== 'middle'){ text+=" align:"+cue.align; }
@@ -95,7 +95,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 					parse_timestamp(fields[1]), //startTime
 					parse_timestamp(fields[2]), //endTime
 					//Replace all U+0000 NULL characters in input by U+FFFD REPLACEMENT CHARACTERs.
-					input.substring(s,p).replace('\0','\uFFFD')
+					input.substring(s,p).replace('\0','\uFFFD').replace(/(\r?\n)+$/g,"")
 				);
 		cue.id = id;
 		parse_settings(cue,fields[3]);
