@@ -188,6 +188,10 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		parseFile: parse,
 		serializeTrack: function(data){
 			if(!(data instanceof Array)){ data = data.cues; }
+			data.sort(function(a,b){
+				//sort first by start time, then by length
+				return (a.startTime - b.startTime) || (b.endTime - a.endTime);
+			});
 			return "WEBVTT\r\n\r\n"+data.map(function(cue){ return serialize(cue); }).join('');;
 		},
 		serializeCue: serialize

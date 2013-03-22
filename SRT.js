@@ -128,6 +128,10 @@
 		parseFile: parse,
 		serializeTrack: function(data){
 			if(!(data instanceof Array)){ data = data.cues; }
+			data.sort(function(a,b){
+				//sort first by start time, then by length
+				return (a.startTime - b.startTime) || (b.endTime - a.endTime);
+			});
 			return data.map(function(cue){ return serialize(cue); }).join('');
 		},
 		serializeCue: serialize

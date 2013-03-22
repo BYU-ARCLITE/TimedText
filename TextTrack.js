@@ -197,15 +197,24 @@ TextTrackCueList.prototype.loadCues = function(cueData) {
 	var track = this.track;
 	cueData.forEach(function(cue){ cue.track = track; } );
 	[].push.apply(this,cueData);
+	this.sort(function(a,b){
+		//sort first by start time, then by length
+		return (a.startTime - b.startTime) || (b.endTime - a.endTime);
+	});
 	track.activeCues.refreshCues();
 };
 TextTrackCueList.prototype.addCue = function(cue) {
+	var i,tcue;
 	if (cue && cue instanceof TextTrackCue) {
 		if (cue.track === this.track || !cue.track) {
-			// TODO: Sort cue list based on TextTrackCue.startTime.
 			if(this.indexOf(cue) !== -1){ return; }
 			cue.track = this.track;
-			this.push(cue);
+			for(i=0;tcue=this[i];i++){
+				if(tcue.startTime > cue.startTime || (tcue.startTime === cue.startTime && tcue.endTime > cue.endTime)){
+					break;
+				}
+			}
+			this.splice(i,0,cue);
 			if(cue.active){ this.track.activeCues.refreshCues(); }
 		} else {
 			throw new Error("This cue is associated with a different track!");
