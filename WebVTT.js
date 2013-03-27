@@ -192,7 +192,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 				//sort first by start time, then by length
 				return (a.startTime - b.startTime) || (b.endTime - a.endTime);
 			});
-			return "WEBVTT\r\n\r\n"+data.map(function(cue){ return serialize(cue); }).join('');;
+			return "WEBVTT\r\n\r\n"+data.map(function(cue){ return serialize(cue); }).join('');
 		},
 		serializeCue: serialize
 	};
