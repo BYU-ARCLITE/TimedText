@@ -43,16 +43,16 @@
 		var s, l, cue, len=input.length;
 		get_text: {
 			if(	(input[p] === '\r') && //Skip CR
-				(++p === len)	){break get_text;}
+				(++p >= len)	){break get_text;}
 			if(	(input[p] === '\n')	&& //Skip LF
-				(++p === len)	){break get_text;}
+				(++p >= len)	){break get_text;}
 			s = p;
 			do{	//Cue text loop:
 				l=p; //Collect a sequence of characters that are not CR or LF characters.
 				while(p < len && input[p] !== '\r' && input[p] !== '\n'){p++;}
 				if(l===p){break;} //terminate on an empty line
 				if(	(input[p] === '\r') && //Skip CR
-					(++p === len)	){break;}
+					(++p >= len)	){break;}
 				if(input[p] === '\n'){ ++p; } //Skip LF
 			}while(p < len); 
 		}
@@ -76,15 +76,15 @@
 		
 		function crlf(){
 			if(	(input[p] === '\r') && //Skip CR
-				(++p === len)	){throw 0;}
+				(++p >= len)	){throw 0;}
 			if(	(input[p] === '\n')	&& //Skip LF
-				(++p === len)	){throw 0;}
+				(++p >= len)	){throw 0;}
 		}
 		
 		function collect_line(){
 			l=p; //Collect a sequence of characters that are not CR or LF characters.
 			while(input[p]!=='\r' && input[p] !=='\n'){
-				if(++p === len){throw 0;}
+				if(++p >= len){throw 0;}
 			}
 		}
 		
@@ -93,13 +93,13 @@
 				/**Skip the number line**/
 				//Skip CR & LF characters.
 				while(input[p]==='\r' || input[p]==='\n'){
-					if(++p === len){break cue_loop;}
+					if(++p >= len){break cue_loop;}
 				}
 				collect_line();
 				/**Get the timecode line**/
 				//Skip CR & LF characters.
 				while(input[p]==='\r' || input[p]==='\n'){
-					if(++p === len){break cue_loop;}
+					if(++p >= len){break cue_loop;}
 				}
 				collect_line();
 				line = input.substring(l,p);

@@ -75,9 +75,9 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		var s, l, e, len=input.length, cue;
 		get_text: {
 			if(	(input[p] === '\r') && //Skip CR
-				(++p === len)	){break get_text;}
+				(++p >= len)	){break get_text;}
 			if(	(input[p] === '\n')	&& //Skip LF
-				(++p === len)	){break get_text;}
+				(++p >= len)	){break get_text;}
 			s = p;
 			do{	//Cue text loop:
 				l = p; //Collect a sequence of characters that are not CR or LF characters.
@@ -85,7 +85,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 				e = p;
 				if(l===p){break;} //terminate on an empty line
 				if(	(input[p] === '\r') && //Skip CR
-					(++p === len)	){break;}
+					(++p >= len)	){break;}
 				if(input[p] === '\n'){ ++p; } //Skip LF
 			}while(p < len); 
 		}
@@ -110,15 +110,15 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		
 		function crlf(){
 			if(	(input[p] === '\r') && //Skip CR
-				(++p === len)	){throw 0;}
+				(++p >= len)	){throw 0;}
 			if(	(input[p] === '\n')	&& //Skip LF
-				(++p === len)	){throw 0;}
+				(++p >= len)	){throw 0;}
 		}
 		
 		function collect_line(){
 			l=p; //Collect a sequence of characters that are not CR or LF characters.
 			while(input[p]!=='\r' && input[p] !=='\n'){
-				if(++p === len){throw 0;}
+				if(++p >= len){throw 0;}
 			}
 		}
 		
@@ -126,7 +126,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 			cue_loop: do{
 				//Skip CR & LF characters.
 				while(input[p]==='\r' || input[p]==='\n'){
-					if(++p === len){break cue_loop;}
+					if(++p >= len){break cue_loop;}
 				}
 				collect_line();
 				line = input.substring(l,p);
@@ -172,12 +172,12 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		if(p === len){return [];}
 		do{	//Header:
 			if(	(input[p] === '\r') && //Skip CR
-				(++p === len)	){return [];}
+				(++p >= len)	){return [];}
 			if(	(input[p] === '\n')	&& //Skip LF
-				(++p === len)	){return [];}
+				(++p >= len)	){return [];}
 			l=p; //Collect a sequence of characters that are not CR or LF characters.
 			while(input[p] !== '\r' && input[p] !== '\n'){
-				if(++p === len){return [];}
+				if(++p >= len){return [];}
 			}
 		}while(l!==p);	//Look for an empty line to finish the header
 		return parse_cues(input,p);
