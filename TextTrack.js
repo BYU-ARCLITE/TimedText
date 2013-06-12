@@ -106,7 +106,7 @@ var TextTrack = (function(){
 					trackElement.renderer && trackElement.renderer.rebuildCaptions(true);
 					trackElement.onload.call(this);
 				
-					(callback instanceof Function) && callback.call(trackElement);
+					if(callback instanceof Function){ callback(trackElement); }
 				} else {
 					// Throw error handler, if defined
 					trackElement.readyState = TextTrack.ERROR;
@@ -138,13 +138,13 @@ var TextTrack = (function(){
 			reader.onload = function(evt) {
 				track = new TextTrack(
 					typeof(params.kind) === "string" ? params.kind : "",
-					typeof(params.label) === "string" ? typeof params.label : TimedText.removeExt(mime, source.name),
+					typeof(params.label) === "string" ? params.label : TimedText.removeExt(mime, source.name),
 					typeof(params.lang) === "string" ? params.lang : ""
 				);
 				track.readyState = TextTrack.LOADED;
 				track.cues.loadCues(TimedText.parseFile(mime, evt.target.result));
 				track.activeCues.refreshCues.apply(track.activeCues);
-				(params.success instanceof Function) && params.success.call(track);
+				if(params.success instanceof Function){ params.success.call(null,track); }
 			};
 			reader.onerror =	(params.error instanceof Function)?
 								params.error:
@@ -164,7 +164,7 @@ var TextTrack = (function(){
 	
 	TextTrack.parse = function(params){ //content, mime, kind, label, lang
 		var track, name = params.label,
-			mime = (typeof(params.mime) === "string" && params.mime.length)?params.mime:TimedText.inferType(name);
+			mime = (typeof(params.mime) === "string" && params.mime)?params.mime:TimedText.inferType(name);
 		try{
 			track = new TextTrack(
 				typeof(params.kind) === "string" ? params.kind : "",
@@ -174,7 +174,7 @@ var TextTrack = (function(){
 			track.readyState = TextTrack.LOADED;
 			track.cues.loadCues(TimedText.parseFile(mime, params.content));
 			track.activeCues.refreshCues.apply(track.activeCues);
-			(params.success instanceof Function) && params.success.call(track);
+			if(params.success instanceof Function){ params.success.call(null,track); }
 		}catch(e){
 			if(params.error instanceof Function){ params.error(e); }
 			else{ alert("The track could not be loaded: " + e.message); }
