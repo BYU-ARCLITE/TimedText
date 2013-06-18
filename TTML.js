@@ -22,6 +22,7 @@ http://www.w3.org/TR/ttaf1-dfxp/
 	
 	TimedText.mime_types['application/ttml+xml'] = {
 		extension: 'ttml',
+		name: 'TTML',
 		parseFile: parse,
 		serializeTrack: function(data){
 			if(!(data instanceof Array)){ data = data.cues; }

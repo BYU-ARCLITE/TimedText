@@ -169,7 +169,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		if(!/^WEBVTT([\u0020\u0009].*|$)/.test(line)){throw new Error("Not WebVTT Data");}
 		
 		//If position is past the end of input, end.
-		if(p === len){return [];}
+		if(p >= len){return [];}
 		do{	//Header:
 			if(	(input[p] === '\r') && //Skip CR
 				(++p >= len)	){return [];}
@@ -185,6 +185,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	
 	TimedText.mime_types['text/vtt'] = {
 		extension: 'vtt',
+		name: 'WebVTT',
 		parseFile: parse,
 		serializeTrack: function(data){
 			if(!(data instanceof Array)){ data = data.cues; }
