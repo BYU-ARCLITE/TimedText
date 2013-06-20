@@ -3,6 +3,38 @@
 	
 	if(!TimedText){ throw new Error("TimedText not defined."); }
 	
+	function SRTCue(start,end,text){
+		TextTrackCue.call(this,start,end,text);
+		this.x1 = null;
+		this.x2 = null;
+		this.y1 = null;
+		this.y2 = null;
+	}
+	
+	/*
+	Bold - <b> ... </b> or {b} ... {/b}
+	Italic - <i> ... </i> or {i} ... {/i}
+	Underline - <u> ... </u> or {u} ... {/u}
+	Font color - <font color="color name or #code"> ... </font> (as in HTML)
+	Nested tags are allowed; some implementations prefer whole-line formatting only.
+	*/
+	
+	function processCueText(text, sanitize){
+		var el = document.createElement('div'),
+			dom = document.createDocumentFragment();
+		el.innerHTML = text;
+		if(sanitize){ el.innerHTML = el.textContent; }
+		[].slice.call(el.childNodes).forEach(dom.appendChild.bind(dom));
+		return dom;
+	}
+	
+	SRTCue.prototype.getCueAsHTML = function(sanitize) {
+		if(!this.DOM){
+			this.DOM = processCueText(this.text,sanitize !== false);
+		}
+		return this.DOM.cloneNode(true);
+	};
+	
 	function SRTtime(time){
 		var seconds = Math.floor(time),
 			minutes = Math.floor(seconds/60),
@@ -17,13 +49,14 @@
 				+(ms>99?ms:(ms>9?"0"+ms:"00"+ms));
 	}
 	
-	function serialize(cue){
-		return (parseInt(cue.id,10)||"0")+"\n"
+	function serialize(cue,index){
+		return (parseInt(cue.id,10)||(index+1))+"\n"
 			+SRTtime(cue.startTime)+" --> "+SRTtime(cue.endTime)
 			+"\n"+cue.text.replace(/(\r?\n)+$/g,"")+"\n\n";
 	}
 	
-	var time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*/;
+	var time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*(.*)/;
+	var set_pat = /X1:(\d+)\s+X2:(\d+)\s+Y1:(\d+)\s+Y2:(\d+)\s*/;
 
 	function parse_timestamp(input){
 		var ret,p,fields;
@@ -37,6 +70,15 @@
 			p = 0;
 		}
 		return ret + parseInt(fields[p],10)*60 + parseInt(fields[++p],10);
+	}
+	
+	function parse_settings(cue,line){
+		var fields = set_pat.exec(line);
+		if(!fields){ return; }
+		cue.x1 = parseInt(fields[1],10);
+		cue.x2 = parseInt(fields[2],10);
+		cue.y1 = parseInt(fields[3],10);
+		cue.y2 = parseInt(fields[4],10);
 	}
 	
 	function add_cue(p,input,id,fields,cue_list){
@@ -56,13 +98,14 @@
 				if(input[p] === '\n'){ ++p; } //Skip LF
 			}while(p < len); 
 		}
-		cue = new TextTrackCue(
+		cue = new SRTCue(
 				parse_timestamp(fields[1]), //startTime
 				parse_timestamp(fields[2]), //endTime
 				//Replace all U+0000 NULL characters in input by U+FFFD REPLACEMENT CHARACTERs.
 				input.substring(s,p).replace('\0','\uFFFD').replace(/(\r?\n)+$/g,"")
 			);
 		cue.id = id;
+		parse_settings(cue,fields[3]);
 		cue_list.push(cue);
 		return p;
 	}
@@ -119,22 +162,22 @@
 		}catch(e){
 			debugger;
 		}finally{//End: The file has ended. The SRT parser has finished.
-			return cue_list;
+			return {
+				cueList: cue_list,
+				kind: 'subtitles',
+				lang: '',
+				label: ''
+			};
 		}
 	}
 	
 	TimedText.mime_types['text/srt'] = {
 		extension: 'srt',
 		name: 'SubRip',
-		parseFile: parse,
-		serializeTrack: function(data){
-			if(!(data instanceof Array)){ data = data.cues; }
-			data.sort(function(a,b){
-				//sort first by start time, then by length
-				return (a.startTime - b.startTime) || (b.endTime - a.endTime);
-			});
-			return data.map(function(cue){ return serialize(cue); }).join('');
-		},
-		serializeCue: serialize
+		cueType: SRTCue,
+		parse: parse,
+		serialize: function(track){
+			return [].map.call(track.cues,function(cue,index){ return serialize(cue,index); }).join('');
+		}
 	};
 }());

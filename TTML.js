@@ -6,36 +6,70 @@ http://www.w3.org/TR/ttaf1-dfxp/
 	
 	if(!TimedText){ throw new Error("TimedText not defined."); }
 	
-	function XMLEncode(s) {
-		return s.replace(/\&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	function TTMLCue(start, end, text){
+		TextTrackCue.call(this,start,end,text);
 	}
+	
+	function processCueText(text){
+		var el = document.createElement('div'),
+			dom = document.createDocumentFragment();
+		el.innerHTML = text.replace(/\n/g, "<br/>");
+		[].slice.call(el.childNodes).forEach(dom.appendChild.bind(dom));
+		return dom;
+	}
+	
+	TTMLCue.prototype.getCueAsHTML = function() {
+		if(!this.DOM){
+			this.DOM = processCueText(this.text);
+		}
+		return this.DOM.cloneNode(true);
+	};
+	
+	function XMLEncode(s) {
+		return s.replace(/\&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r\n|(\r[^\n])|([^\r]\n)/g, "<br/>");
+	}
+	
+	function XMLDecode(s) {
+		return s.replace(/<br\/>/g, '\n').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
+	}
+	
 	function serialize(cue){
 		return cue.text === ""?"":
 			'<p begin="' + cue.startTime.toFixed(3)
 			+ 's" end="' + cue.endTime.toFixed(3)
-			+ 's">' + XMLEncode(cue.text).replace(/\r\n|\r|\n/g, "<br />") + "</p>";
+			+ 's">' + XMLEncode(cue.text) + "</p>";
+	}
+	
+	function parseTTMLTime(timestamp){
+		//TODO: Actually implement TTML timestamp spec
+		return parseFloat(timestamp);
 	}
 	
 	function parse(input){
-		throw new Error("TTML Parsing Not Yet Implemented");
+		//Not Sure If This Actually Works
+		var DOM = (new DOMParser).parseFromString(input);
+		return {
+			cueList: [].map.call(DOM.getElementsByTagName('p'),function(p){
+				return new TTMLCue(	parseTTMLTime(p.getAttribute('begin')),
+									parseTTMLTime(p.getAttribute('end')),
+									XMLDecode(p.textContent)	);
+			}),
+			kind: 'subtitles',
+			lang: DOM.documentElement.getAttribute('xml:lang'),
+			label: ''
+		};
 	}	
 	
 	TimedText.mime_types['application/ttml+xml'] = {
 		extension: 'ttml',
 		name: 'TTML',
-		parseFile: parse,
-		serializeTrack: function(data){
-			if(!(data instanceof Array)){ data = data.cues; }
-			data.sort(function(a,b){
-				//sort first by start time, then by length
-				return (a.startTime - b.startTime) || (b.endTime - a.endTime);
-			});
-			//TODO: fix the "lang" attribute
-			return "<?xml version='1.0' encoding='UTF-8'?>\
-			<tt xmlns=\"http://www.w3.org/ns/ttml\" xml:lang=\"en\"><body><div>"
-				+ data.map(function(cue){ return serialize(cue); }).join('')
+		parse: parse,
+		cueType: TTMLCue,
+		serialize: function(track){
+			return "<?xml version='1.0' encoding='UTF-8'?>"
+				+ "<tt xmlns=\"http://www.w3.org/ns/ttml\" xml:lang=\""+track.language+"\"><body><div>"
+				+ [].map.call(track.cues,function(cue){ return serialize(cue); }).join('')
 				+ "</div></body></tt>";
-		},
-		serializeCue: serialize
+		}
 	};
 }());

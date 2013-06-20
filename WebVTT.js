@@ -6,6 +6,104 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	
 	if(!TimedText){ throw new Error("TimedText not defined."); }
 	
+	function WebVTTCue(start, end, text){
+		TextTrackCue.call(this,start,end,text);
+	}
+	
+	//http://dev.w3.org/html5/webvtt/#webvtt-cue-text-dom-construction-rules
+	function createTimestampNode(timeData){
+		var node,
+			hh = parseInt(timeData[1],10)|| 0,
+			mm = parseInt(timeData[2],10) || 0,
+			ss = parseInt(timeData[3],10) || 0,
+			ms = parseFloat("0."+timeData[4]);
+			
+		node = document.createElement('i');
+		node.dataset.target = "timestamp";
+		node.dataset.seconds = hh*3600+mm*60+ss+ms;
+		
+		ms *= 1000;
+		node.dataset.timestamp = (hh>9?hh:"0"+hh)+":" +
+					(mm>9?mm:"0"+mm)+":" +
+					(ss>9?ss:"0"+ss)+"." +
+					(ms>99?ms:(ms>9?"0"+ms:"00"+ms));
+		return node;
+	}
+	
+	function hasRealTextContent(textInput) {
+		return !!textInput.replace(/[^a-z0-9]+/ig,"").length;
+	}
+	
+	function processCaptionHTML(inputHTML,sanitize) {
+		var DOM = document.createDocumentFragment(),
+			current = DOM,
+			stack = [],
+			lang = "";
+		
+		inputHTML
+			.split(/(<\/?[^>]+>)/ig)
+			.filter(function(cuePortionText) {
+				return !!cuePortionText.replace(/\s*/ig,"");
+			}).forEach(function(token) {
+			var tag, chunk, node, frags;
+			if (token[0] !== "<") { // Text string
+				if(sanitize){
+					frags = token.replace(/\n\r/g,'\n').split(/\n(?!$)/g);
+					frags.forEach(function(frag){
+						current.appendChild(document.createTextNode(frag));
+						current.appendChild(document.createElement('br'));
+					});
+					current.removeChild(current.lastChild);
+				}else{
+					current.appendChild(document.createTextNode(token));
+				}
+			}else if (token[1] === "/") { //Closing tag
+				tag = token.match(/<\/([^\s>]+)/)[1].toUpperCase();
+				if(tag === current.nodeName || (current.dataset && tag === current.dataset.cuetag)){
+					if(tag === 'LANG'){ lang = stack.pop(); }
+					current = current.parentNode;
+				}
+				// else tag mismatch; ignore.
+			} else { //Opening tag
+				if(chunk = token.match(/<(\d{2})?:?(\d{2}):(\d{2})[\.\,](\d+)/)){
+					current.appendChild(createTimestampNode(chunk));
+					return;
+				}else if(chunk = token.match(/<v\s+([^>]+)>/i)){
+					node = document.createElement('span');
+					node.title = node.dataset.voice = chunk[1].replace(/[\"]/g,"");
+					node.dataset.cuetag = "V";
+				}else if(token.match(/<c[a-z0-9\-\_\.]+>/i)){
+					node = document.createElement('span');
+					node.className = token.replace(/[<\/>\s]+/ig,"")
+										.split(/[\.]+/ig)
+										.slice(1)
+										.filter(hasRealTextContent).join(' ');
+					node.dataset.cuetag = "C";
+				}else if(chunk = token.match(/<lang\s+([^>]+)>/i)){
+					node = document.createElement('span');
+					node.dataset.cuetag = "LANG";
+					stack.push(lang);
+					lang = chunk[1];
+				}else if(chunk = token.match(sanitize?/<(b|i|u|ruby|rt)>/:/<(\w+)>/)){
+					node = document.createElement(chunk[1]);
+				}else{
+					return;
+				}
+				if(lang){ node.lang = lang; }
+				current.appendChild(node);
+				current = node;
+			}
+		});
+		return DOM;
+	}
+	
+	WebVTTCue.prototype.getCueAsHTML = function(sanitize) {
+		if(!this.DOM){
+			this.DOM = processCaptionHTML(this.text,sanitize !== false);
+		}
+		return this.DOM.cloneNode(true);
+	};
+	
 	var WebVTTDEFAULTSCueParser		= /^DEFAULTS?\s+\-\-\>\s+(.*)/g;
 	var WebVTTSTYLECueParser		= /^STYLES?\s+\-\-\>\s*\n([\s\S]*)/g;
 	var WebVTTCOMMENTCueParser		= /^COMMENTS?\s+\-\-\>\s+(.*)/g;
@@ -90,8 +188,9 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 			}while(p < len); 
 		}
 		//Cue text processing:
-		//This where we ought to construct the cue-text DOM
-		cue = new TextTrackCue(
+		//This where the spec says we ought to construct the cue-text DOM;
+		//we actually implement that in the WebVTTCue getCueAsHTML method.
+		cue = new WebVTTCue(
 					parse_timestamp(fields[1]), //startTime
 					parse_timestamp(fields[2]), //endTime
 					//Replace all U+0000 NULL characters in input by U+FFFD REPLACEMENT CHARACTERs.
@@ -154,7 +253,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	}
 
 	function parse(input){
-		var line,l,p,
+		var line, l, p,
 			len = input.length;
 
 		//If the first character is a BYTE ORDER MARK, skip it.
@@ -179,22 +278,23 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 			while(input[p] !== '\r' && input[p] !== '\n'){
 				if(++p >= len){return [];}
 			}
-		}while(l!==p);	//Look for an empty line to finish the header
-		return parse_cues(input,p);
-	}	
+		}while(l!==p);	//Look for an empty line to finish the header		
+		return {
+			cueList: parse_cues(input,p),
+			kind: 'subtitles',
+			lang: '',
+			label: ''
+		};
+		
+	}
 	
 	TimedText.mime_types['text/vtt'] = {
 		extension: 'vtt',
 		name: 'WebVTT',
-		parseFile: parse,
-		serializeTrack: function(data){
-			if(!(data instanceof Array)){ data = data.cues; }
-			data.sort(function(a,b){
-				//sort first by start time, then by length
-				return (a.startTime - b.startTime) || (b.endTime - a.endTime);
-			});
-			return "WEBVTT\r\n\r\n"+data.map(function(cue){ return serialize(cue); }).join('');
-		},
-		serializeCue: serialize
+		cueType: WebVTTCue,
+		parse: parse,
+		serialize: function(track){
+			return "WEBVTT\r\n\r\n"+[].map.call(track.cues,function(cue){ return serialize(cue); }).join('');
+		}
 	};
 }());

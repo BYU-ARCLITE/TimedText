@@ -14,6 +14,26 @@
 	
 	var time_pat = /\s*(\d):([0-5]\d):([0-5]\d):(\d\d)\s*/;
 
+	function ASSCue(start,end,text){
+		TextTrackCue.call(this,start,end,text);
+	}
+	
+	function processCueText(text, sanitize){
+		//replace with actual ASS text processing algorithm
+		var el = document.createElement('div'),
+			dom = document.createDocumentFragment();
+		el.innerHTML = text;
+		[].slice.call(el.childNodes).forEach(dom.appendChild.bind(dom));
+		return dom;
+	}
+	
+	ASSCue.prototype.getCueAsHTML = function() {
+		if(!this.DOM){
+			this.DOM = processCueText(this.text);
+		}
+		return this.DOM.cloneNode(true);
+	};
+	
 	function SSAtime(time){
 		var seconds = Math.floor(time),
 			minutes = Math.floor(seconds/60),
@@ -155,23 +175,26 @@
 		while(typeof section === 'function'){
 			section = section(globals, lines);
 		}
-		return globals.cuelist;
+		return {
+			cueList: globals.cuelist,
+			kind: 'subtitles',
+			lang: '',
+			label: ''
+		};
 	}	
 	
 	TimedText.mime_types['text/x-ssa'] = {
 		extension: 'ass',
 		name: 'Sub Station Alpha',
-		parseFile: parse,
-		serializeTrack:  function(data){
+		cueType: ASSCue,
+		parse: parse,
+		serialize:  function(data){
 			if(!(data instanceof Array)){ data = data.cues; }
 			//Don't know if all of the fields are reuired or not; if they are, it may take some finagling to come up with reasonable values
 			return "[Script Info]\nScriptType: v4.00+\nCollisions: Normal\nPlayResY: 600\nPlayResX: 800\nTimer: 100.0000\nWrapStyle:0\n\n"
 			+"[V4+ Styles]\nFormat: Name, Fontname\nStyle: DefaultStyle, Arial\n\n"
 			+"[Events]\nFormat: Marked,Start,End,Style,Text\n"
 			+data.map(function(cue){ return serializeCue(cue,"DefaultStyle"); }).join('');
-		},
-		serializeCue: function(cue){
-			throw new Error("Cannot Serialize Individual Sub Station Alpha Cue");
 		}
 	};
 }());

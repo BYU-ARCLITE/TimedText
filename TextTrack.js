@@ -7,11 +7,7 @@ var TextTrack = (function(){
 		"captions":true,
 		"descriptions":true,
 		"metadata":true,
-		"chapters":true,
-		 // CAPTIONATOR TEXT EXTENSIONS
-		"karaoke":true,
-		"lyrics":true,
-		"tickertext":true
+		"chapters":true
 	};
 
 	/*	Subclassing DOMException so we can reliably throw it without browser intervention. This is quite hacky. See SO post:
@@ -88,97 +84,87 @@ var TextTrack = (function(){
 	TextTrack.prototype.onload = function () {};
 	TextTrack.prototype.onerror = function() {};
 	TextTrack.prototype.oncuechange = function() {};
-	// mutableTextTrack.addCue(cue)
-	// Adds the given cue to mutableTextTrack's text track list of cues.
-	// Raises an exception if the argument is null, associated with another text track, or already in the list of cues.
 	TextTrack.prototype.addCue = function(cue) { this.cues.addCue(cue);	};
-	// mutableTextTrack.removeCue(cue)
-	// Removes the given cue from mutableTextTrack's text track list of cues.
-	// Raises an exception if the argument is null or not in the list of cues.
 	TextTrack.prototype.removeCue = function(cue) { this.cues.removeCue(cue); };
-	TextTrack.prototype.loadTrack = (function(){
-		function loadTrackReadyState(trackElement, callback, eventData) {
-			if (this.readyState === 4) {
-				if(this.status === 200) {
-					trackElement.readyState = TextTrack.LOADED;
-					trackElement.cues.loadCues(TimedText.parseFile(this.getResponseHeader('content-type'),this.responseText));
-					trackElement.activeCues.refreshCues.apply(trackElement.activeCues);
-					trackElement.renderer && trackElement.renderer.rebuildCaptions(true);
-					trackElement.onload.call(this);
-				
-					if(callback instanceof Function){ callback(trackElement); }
-				} else {
-					// Throw error handler, if defined
-					trackElement.readyState = TextTrack.ERROR;
-					trackElement.onerror();
-				}
-			}
-		}
-		return function(source, callback) {
-			//TODO: handle a SourceElement list
-			var ajaxObject = new XMLHttpRequest();
-			this.readyState = TextTrack.LOADING;
-			ajaxObject.open('GET', source, true);
-			ajaxObject.onreadystatechange = loadTrackReadyState.bind(ajaxObject, this, callback);
-			try { ajaxObject.send(null); }
-			catch(err) {
-				// Throw error handler, if defined
-				this.readyState = TextTrack.ERROR;
-				this.onerror(err);
-			}
-		};
-	}());
-	
-	TextTrack.get = function(params){ //url|file, kind, label, lang
-		var source, reader, track, mime;
-		if(params.file instanceof File){
-			source = params.file;
-			mime = source.type || TimedText.inferType(source.name);
-			reader = new FileReader();
-			reader.onload = function(evt) {
-				track = new TextTrack(
-					typeof(params.kind) === "string" ? params.kind : "",
-					typeof(params.label) === "string" ? params.label : TimedText.removeExt(mime, source.name),
-					typeof(params.lang) === "string" ? params.lang : ""
-				);
-				track.readyState = TextTrack.LOADED;
-				track.cues.loadCues(TimedText.parseFile(mime, evt.target.result));
-				track.activeCues.refreshCues.apply(track.activeCues);
-				if(params.success instanceof Function){ params.success.call(null,track); }
-			};
-			reader.onerror =	(params.error instanceof Function)?
-								params.error:
-								function(e){alert(e.message);};
-			reader.readAsText(source);
-		}else{
-			source = params.url;
-			track = new TextTrack(
-				typeof(params.kind) === "string" ? params.kind : "",
-				typeof(params.label) === "string" ? params.label : TimedText.removeExt(mime, source.substr(source.lastIndexOf('/'))),
-				typeof(params.lang) === "string" ? params.lang : ""
-			);
-			if(params.error instanceof Function){ track.onerror = params.error; }
-			track.loadTrack(source,params.success);
-		}
-	};
 	
 	TextTrack.parse = function(params){ //content, mime, kind, label, lang
-		var track, name = params.label,
+		var track, trackData, name = params.label,
 			mime = (typeof(params.mime) === "string" && params.mime)?params.mime:TimedText.inferType(name);
 		try{
+			trackData = TimedText.parse(mime, params.content);
 			track = new TextTrack(
-				typeof(params.kind) === "string" ? params.kind : "",
+				typeof(params.kind) === "string" ? params.kind : trackData.kind,
 				TimedText.removeExt(mime, name),
-				typeof(params.lang) === "string" ? params.lang : ""
+				typeof(params.lang) === "string" ? params.lang : trackData.lang
 			);
+			track.cues.loadCues(trackData.cueList);
 			track.readyState = TextTrack.LOADED;
-			track.cues.loadCues(TimedText.parseFile(mime, params.content));
-			track.activeCues.refreshCues.apply(track.activeCues);
+			track.activeCues.refreshCues();
 			if(params.success instanceof Function){ params.success.call(null,track); }
 		}catch(e){
 			if(params.error instanceof Function){ params.error(e); }
 			else{ alert("The track could not be loaded: " + e.message); }
 		}
+	};
+	
+	TextTrack.get = function(params){ //url|file, kind, label, lang
+		var source, reader, track;
+		
+		track = new TextTrack(
+			typeof(params.kind) === "string" ? params.kind : "",
+			typeof(params.label) === "string" ? params.label : "",
+			typeof(params.lang) === "string" ? params.lang : ""
+		);
+		if(typeof params.error === 'function'){ track.onerror = params.error; }
+		track.readyState = TextTrack.LOADING;
+		
+		function load(trackData){
+			if(!track.kind){ track.kind = trackData.kind; }
+			if(!track.kind){ track.kind = trackData.kind; }
+				
+			track.cues.loadCues(trackData.cueList);
+			track.activeCues.refreshCues();
+			track.readyState = TextTrack.LOADED;
+			track.onload();
+			if(typeof params.success === 'function'){ params.success.call(null,track); }
+		}
+		
+		if(params.file instanceof File){
+			source = params.file;
+			reader = new FileReader();
+			reader.onerror = params.error;
+			reader.onload = function(evt) {
+				var mime = source.type || TimedText.inferType(source.name),
+					trackData = TimedText.parse(mime, evt.target.result);
+				if(!track.label){ track.label = TimedText.removeExt(mime, source.name); }
+				load(trackData);
+			};
+			reader.readAsText(source);
+		}else{
+			source = params.url;
+			reader = new XMLHttpRequest();
+			reader.open('GET', source, true);
+			reader.onreadystatechange = function(eventData) {
+				var mime, trackData;
+				if (this.readyState !== 4) { return; }
+				if(this.status !== 200) {
+					track.readyState = TextTrack.ERROR;
+					track.onerror(new Error());
+					return;
+				}
+				
+				mime = this.getResponseHeader('content-type');
+				trackData = TimedText.parse(mime,this.responseText);
+				if(!track.label){ track.label = TimedText.removeExt(mime, source.substr(source.lastIndexOf('/'))); }
+				load(trackData);
+			};
+			try { reader.send(null); }
+			catch(err) {
+				track.readyState = TextTrack.ERROR;
+				track.onerror(err);
+			}
+		}
+		return track;
 	};
 	
 	return TextTrack;
