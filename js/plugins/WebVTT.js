@@ -18,15 +18,16 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		throw new SyntaxError("Invalid Percentage");
 	}
 	
-	function WebVTTCue(start, end, text){
+	var WebVTTCue = TimedText.makeCueType(function(){
 		var dir = '',
+			snapToLines = true,
 			line = "auto",
 			position = 50,
 			size = 100,
 			align = "middle";
-		TextTrackCue.call(this,start,end,text);
-		this.snapToLines = true;
+			
 		Object.defineProperties(this,{
+			snapToLines: { get: function(){ return snapToLines; }, enumerable: true },
 			vertical: {
 				set: function(value){
 					if(allowedDirs.hasOwnProperty(value)){ return (dir = value); }
@@ -44,16 +45,20 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 			line: {
 				set: function(value){
 					var number;
-					this.snapToLines=true;
-					if(typeof value === 'number'){ line = value+""; }
-					else if(value==='auto'){ line = 'auto'; }
-					else if(/^-?\d+%?$/.test(value)){
+					if(typeof value === 'number'){
+						snapToLines = true;
+						line = value+"";
+					}else if(value==='auto'){
+						snapToLines = true;
+						line = 'auto';
+					}else if(/^-?\d+%?$/.test(value)){
 						number = parseInt(value,10);
 						if(value[value.length-1] === '%'){	//If the last character in value is %
 							if(number<0 || number>100){ throw new SyntaxError("Invalid Percentage"); }
-							this.snapToLines = false;
+							snapToLines = false;
 							line = number + "%";
 						}else{
+							snapToLines = true;
 							line = ""+number;
 						}
 					}else{
@@ -74,7 +79,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 				enumerable: true
 			}
 		});
-	}
+	});
 	
 	//http://dev.w3.org/html5/webvtt/#webvtt-cue-text-dom-construction-rules
 	function createTimestampNode(timeData){
@@ -163,9 +168,9 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		return DOM;
 	}
 	
-	WebVTTCue.prototype.getCueAsHTML = function(sanitize) {
+	WebVTTCue.prototype.getCueAsHTML = function() {
 		if(!this.DOM){
-			this.DOM = processCaptionHTML(this.text,sanitize !== false);
+			this.DOM = processCaptionHTML(this.text,!(this.track && this.track.kind === 'html'));
 		}
 		return this.DOM.cloneNode(true);
 	};
@@ -319,7 +324,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	}
 
 	function parse(input){
-		var line, l, p,
+		var line, l, p, cueList,
 			len = input.length;
 
 		//If the first character is a BYTE ORDER MARK, skip it.
@@ -334,19 +339,21 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		if(!/^WEBVTT([\u0020\u0009].*|$)/.test(line)){throw new Error("Not WebVTT Data");}
 		
 		//If position is past the end of input, end.
-		if(p >= len){return [];}
-		do{	//Header:
-			if(	(input[p] === '\r') && //Skip CR
-				(++p >= len)	){return [];}
-			if(	(input[p] === '\n')	&& //Skip LF
-				(++p >= len)	){return [];}
-			l=p; //Collect a sequence of characters that are not CR or LF characters.
-			while(input[p] !== '\r' && input[p] !== '\n'){
-				if(++p >= len){return [];}
-			}
-		}while(l!==p);	//Look for an empty line to finish the header		
+		if(p < len) parseCues: {
+			do{	//Header:
+				if(	(input[p] === '\r') && //Skip CR
+					(++p >= len)	){break parseCues;}
+				if(	(input[p] === '\n')	&& //Skip LF
+					(++p >= len)	){break parseCues;}
+				l=p; //Collect a sequence of characters that are not CR or LF characters.
+				while(input[p] !== '\r' && input[p] !== '\n'){
+					if(++p >= len){break parseCues;}
+				}
+			}while(l!==p);	//Look for an empty line to finish the header
+			cueList = parse_cues(input,p);
+		}
 		return {
-			cueList: parse_cues(input,p),
+			cueList: cueList || [],
 			kind: 'subtitles',
 			lang: '',
 			label: ''
@@ -414,7 +421,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 				cueX = 0, cueY = 0, cueWidth = 0, cueHeight = 0, cuePaddingLR = 0, cuePaddingTB = 0,
 				cueSize, cueLine, cueVertical = cueObject.vertical, cueSnap = cueObject.snapToLines, cuePosition = cueObject.position,
 				baseFontSize, basePixelFontSize, baseLineHeight,
-				videoHeightInLines, videoWidthInLines, pixelLineHeight, verticalPixelLineHeight;
+				pixelLineHeight, verticalPixelLineHeight;
 
 			// Calculate font metrics
 			baseFontSize = Math.max(((videoMetrics.height * 0.045)/96)*72, 10);
@@ -431,10 +438,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 			if (pixelLineHeight * Math.floor(videoMetrics.width / pixelLineHeight) < videoMetrics.width) {
 				verticalPixelLineHeight = Math.ceil(videoMetrics.width / Math.floor(videoMetrics.width / pixelLineHeight));
 			}
-			
-			// Calculate render area height & width in lines
-			videoWidthInLines = Math.floor(availableCueArea.width / verticalPixelLineHeight);
-			
+						
 			if (cueVertical === "") {
 				DOMNode.style.display = "inline-block";
 				cuePaddingLR = Math.floor(videoMetrics.width/100);
@@ -445,15 +449,15 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 			//http://dev.w3.org/html5/webvtt/#applying-css-properties-to-webvtt-node-objects
 			//not quite perfect compliance, but close, especially given vertical-text hacks
 			applyStyles(DOMNode,{
-				"position": "absolute",
-				"unicodeBidi": "plaintext",
-				"overflow": "hidden",
-				"height": pixelLineHeight + "px", //so the scrollheight has a baseline to work from
-				"padding": cuePaddingTB + "px " + cuePaddingLR + "px",
-				"textAlign": (cueVertical !== "")?"":(cueObject.align === "middle"?"center":cueObject.align),
-				"direction": TimedText.getTextDirection(DOMNode.textContent),
-				"lineHeight": baseLineHeight + "pt",
-				"boxSizing": "border-box"
+				position: "absolute",
+				unicodeBidi: "plaintext",
+				overflow: "hidden",
+				height: pixelLineHeight + "px", //so the scrollheight has a baseline to work from
+				padding: cuePaddingTB + "px " + cuePaddingLR + "px",
+				textAlign: (cueVertical !== "")?"":(cueObject.align === "middle"?"center":cueObject.align),
+				direction: TimedText.getTextDirection(DOMNode.textContent),
+				lineHeight: baseLineHeight + "pt",
+				boxSizing: "border-box"
 			});	
 			
 			cueSize = cueObject.size;			
@@ -643,7 +647,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		};
 	}());
 	
-	TimedText.mime_types['text/vtt'] = {
+	TimedText.registerType('text/vtt',{
 		extension: 'vtt',
 		name: 'WebVTT',
 		cueType: WebVTTCue,
@@ -655,5 +659,5 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		serialize: function(track){
 			return "WEBVTT\r\n\r\n"+[].map.call(track.cues,function(cue){ return serialize(cue); }).join('');
 		}
-	};
+	});
 }());

@@ -99,7 +99,7 @@ var TextTrack = (function(){
 			track.cues.loadCues(trackData.cueList);
 			track.readyState = TextTrack.LOADED;
 			track.activeCues.refreshCues();
-			if(params.success instanceof Function){ params.success.call(null,track); }
+			if(params.success instanceof Function){ params.success.call(null,track,mime); }
 		}catch(e){
 			if(params.error instanceof Function){ params.error(e); }
 			else{ alert("The track could not be loaded: " + e.message); }
@@ -110,14 +110,14 @@ var TextTrack = (function(){
 		var source, reader, track;
 		
 		track = new TextTrack(
-			typeof(params.kind) === "string" ? params.kind : "",
-			typeof(params.label) === "string" ? params.label : "",
-			typeof(params.lang) === "string" ? params.lang : ""
+			typeof params.kind === "string" ? params.kind : "",
+			typeof params.label === "string" ? params.label : "",
+			typeof params.lang === "string" ? params.lang : ""
 		);
 		if(typeof params.error === 'function'){ track.onerror = params.error; }
 		track.readyState = TextTrack.LOADING;
 		
-		function load(trackData){
+		function load(trackData,mime){
 			if(!track.kind){ track.kind = trackData.kind; }
 			if(!track.kind){ track.kind = trackData.kind; }
 				
@@ -125,7 +125,7 @@ var TextTrack = (function(){
 			track.activeCues.refreshCues();
 			track.readyState = TextTrack.LOADED;
 			track.onload();
-			if(typeof params.success === 'function'){ params.success.call(null,track); }
+			if(typeof params.success === 'function'){ params.success.call(null,track,mime); }
 		}
 		
 		if(params.file instanceof File){
@@ -136,7 +136,7 @@ var TextTrack = (function(){
 				var mime = source.type || TimedText.inferType(source.name),
 					trackData = TimedText.parse(mime, evt.target.result);
 				if(!track.label){ track.label = TimedText.removeExt(mime, source.name); }
-				load(trackData);
+				load(trackData,mime);
 			};
 			reader.readAsText(source);
 		}else{
@@ -155,7 +155,7 @@ var TextTrack = (function(){
 				mime = this.getResponseHeader('content-type');
 				trackData = TimedText.parse(mime,this.responseText);
 				if(!track.label){ track.label = TimedText.removeExt(mime, source.substr(source.lastIndexOf('/'))); }
-				load(trackData);
+				load(trackData,mime);
 			};
 			try { reader.send(null); }
 			catch(err) {

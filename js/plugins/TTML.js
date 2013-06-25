@@ -60,7 +60,7 @@ http://www.w3.org/TR/ttaf1-dfxp/
 		};
 	}	
 	
-	TimedText.mime_types['application/ttml+xml'] = {
+	TimedText.registerType('application/ttml+xml', {
 		extension: 'ttml',
 		name: 'TTML',
 		parse: parse,
@@ -71,5 +71,5 @@ http://www.w3.org/TR/ttaf1-dfxp/
 				+ [].map.call(track.cues,function(cue){ return serialize(cue); }).join('')
 				+ "</div></body></tt>";
 		}
-	};
+	});
 }());

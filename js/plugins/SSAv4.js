@@ -183,7 +183,7 @@
 		};
 	}	
 	
-	TimedText.mime_types['text/x-ssa'] = {
+	TimedText.registerType('text/x-ssa',{
 		extension: 'ass',
 		name: 'Sub Station Alpha',
 		cueType: ASSCue,
@@ -196,5 +196,5 @@
 			+"[Events]\nFormat: Marked,Start,End,Style,Text\n"
 			+data.map(function(cue){ return serializeCue(cue,"DefaultStyle"); }).join('');
 		}
-	};
+	});
 }());

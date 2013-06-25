@@ -1,4 +1,4 @@
-(function(){
+(function(TimedText){
 	"use strict";
 	
 	if(!TimedText){ throw new Error("TimedText not defined."); }
@@ -6,13 +6,12 @@
 	var time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*(.*)/;
 	var set_pat = /X1:(\d+)\s+X2:(\d+)\s+Y1:(\d+)\s+Y2:(\d+)\s*/;
 	
-	function SRTCue(start,end,text){
-		TextTrackCue.call(this,start,end,text);
+	var SRTCue = TimedText.makeCueType(function(){
 		this.x1 = null;
 		this.x2 = null;
 		this.y1 = null;
 		this.y2 = null;
-	}
+	});
 	
 	/*
 	Bold - <b> ... </b> or {b} ... {/b}
@@ -54,7 +53,7 @@
 	function serialize(cue,index){
 		return (parseInt(cue.id,10)||(index+1))+"\n"
 			+ SRTtime(cue.startTime)+" --> "+SRTtime(cue.endTime)
-			+ (cue.x1 !== null?(" X1:"+cue.x1+" X2:"+cue.x2+" Y1:"+cue.y1+" Y2:"+cue.y2+"\n"):"\n")
+			+ (typeof cue.x1 === 'number'?(" X1:"+cue.x1+" X2:"+cue.x2+" Y1:"+cue.y1+" Y2:"+cue.y2+"\n"):"\n")
 			+ cue.text.replace(/(\r?\n)+$/g,"")+"\n\n";
 	}
 
@@ -187,46 +186,12 @@
 	function positionCue(rendered, availableCueArea, videoMetrics) {
 		var DOMNode = rendered.node,
 			cueObject = rendered.cue,
-			cueX, cueY, cueWidth, cueHeight,
+			cueX = 0, cueY = 0, cueWidth = 0, cueHeight = 0,
 			baseFontSize, basePixelFontSize, baseLineHeight, pixelLineHeight;
 
-		// Calculate font metrics
-		baseFontSize = Math.max(((videoMetrics.height * 4.5)/96)*72, 10);
-		basePixelFontSize = Math.floor((baseFontSize/72)*96);
-		baseLineHeight = Math.max(Math.floor(baseFontSize * 1.3), 16);
-		pixelLineHeight = Math.ceil((baseLineHeight/72)*96);
-
-		if (pixelLineHeight * Math.floor(videoMetrics.height / pixelLineHeight) < videoMetrics.height) {
-			pixelLineHeight = Math.floor(videoMetrics.height / Math.floor(videoMetrics.height / pixelLineHeight));
-			baseLineHeight = Math.ceil((pixelLineHeight/96)*72);
-		}
+		baseFontSize = Math.max(((videoMetrics.height * 0.045)/96)*72, 10);
 		
-		if(cueObject.x1 === null){
-			cueWidth = availableCueArea.width;
-			cueX = ((availableCueArea.right - cueWidth)/2) + availableCueArea.left;
-			
-			applyStyles(DOMNode,{
-				position: "absolute",
-				unicodeBidi: "plaintext",
-				overflow: "hidden",
-				height: pixelLineHeight + "px", //so the scrollheight has a baseline to work from
-				width: cueWidth + "px",
-				left: cueX + "px",
-				padding: Math.floor(videoMetrics.height/100) + "px 0px",
-				textAlign: "center",
-				direction: TimedText.getTextDirection(""+cueObject.text),
-				lineHeight: baseLineHeight + "pt",
-				boxSizing: "border-box"
-			});	
-
-			cueHeight = Math.round(DOMNode.scrollHeight/pixelLineHeight)*pixelLineHeight;
-			cueY = availableCueArea.height + availableCueArea.top - cueHeight;
-			DOMNode.style.height = cueHeight + "px";
-			DOMNode.style.top = cueY + "px";
-			
-			availableCueArea.bottom = cueY;
-			availableCueArea.height = availableCueArea.bottom - availableCueArea.top;
-		}else{
+		if(typeof cueObject.x1 === 'number'){
 			applyStyles(DOMNode,{
 				position: "absolute",
 				unicodeBidi: "plaintext",
@@ -245,17 +210,63 @@
 				baseFontSize = Math.floor(2 * baseFontSize * DOMNode.offsetHeight / DOMNode.scrollHeight)/2;
 				DOMNode.fontSize = baseFontSize + "px";
 			}
+		}else{
+			// Calculate font metrics
+			basePixelFontSize = Math.floor((baseFontSize/72)*96);
+			baseLineHeight = Math.max(Math.floor(baseFontSize * 1.2), 14);
+			pixelLineHeight = Math.ceil((baseLineHeight/72)*96);
+			
+			if (pixelLineHeight * Math.floor(videoMetrics.height / pixelLineHeight) < videoMetrics.height) {
+				pixelLineHeight = Math.floor(videoMetrics.height / Math.floor(videoMetrics.height / pixelLineHeight));
+				baseLineHeight = Math.ceil((pixelLineHeight/96)*72);
+			}
+			
+			cueWidth = availableCueArea.width;
+			cueX = ((availableCueArea.right - cueWidth)/2) + availableCueArea.left;
+			
+			applyStyles(DOMNode,{
+				display: "inline-block",
+				position: "absolute",
+				unicodeBidi: "plaintext",
+				overflow: "hidden",
+				height: pixelLineHeight + "px", //so the scrollheight has a baseline to work from
+				width: cueWidth + "px",
+				left: cueX + "px",
+				padding: "0px " + Math.floor(videoMetrics.width/100) + "px",
+				textAlign: "center",
+				direction: TimedText.getTextDirection(DOMNode.textContent),
+				lineHeight: baseLineHeight + "pt",
+				boxSizing: "border-box"
+			});	
+			
+			cueHeight = Math.round(DOMNode.scrollHeight/pixelLineHeight)*pixelLineHeight;
+			cueY = availableCueArea.height + availableCueArea.top - cueHeight;
+			DOMNode.style.height = cueHeight + "px";
+			DOMNode.style.top = cueY + "px";
+			
+			// Work out how to shrink the available render area
+			// If subtracting from the bottom works out to a larger area, subtract from the bottom.
+			// Otherwise, subtract from the top.
+			if ((cueY - 2*availableCueArea.top) >=
+				(availableCueArea.bottom - (cueY + cueHeight)) &&
+				availableCueArea.bottom > cueY) {
+				availableCueArea.bottom = cueY;
+			} else if (availableCueArea.top < cueY + cueHeight) {
+				availableCueArea.top = cueY + cueHeight;
+			}
+			availableCueArea.height = availableCueArea.bottom - availableCueArea.top;
 		}
 	}
 	
-	TimedText.mime_types['text/srt'] = {
+	TimedText.registerType('text/srt', {
 		extension: 'srt',
 		name: 'SubRip',
 		cueType: SRTCue,
+		isCueCompatible: function(cue){ return cue instanceof SRTCue; },
 		positionCue: positionCue,
 		parse: parse,
 		serialize: function(track){
 			return [].map.call(track.cues,function(cue,index){ return serialize(cue,index); }).join('');
 		}
-	};
-}());
+	});
+}(window.TimedText));

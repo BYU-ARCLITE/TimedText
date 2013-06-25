@@ -89,42 +89,54 @@
 	function defaultPosCue(rendered, availableCueArea, videoMetrics) {
 		var DOMNode = rendered.node,
 			cueObject = rendered.cue,
-			cueX, cueY, cueWidth, cueHeight,
-			baseFontSize, baseLineHeight, pixelLineHeight;
+			cueX = 0, cueY = 0, cueWidth = 0, cueHeight = 0,
+			baseFontSize, basePixelFontSize, baseLineHeight, pixelLineHeight;
 
 		// Calculate font metrics
-		baseFontSize = Math.max(((videoMetrics.height * 4.5)/96)*72, 10);
-		baseLineHeight = Math.max(Math.floor(baseFontSize * 1.3), 16);
+		baseFontSize = Math.max(((videoMetrics.height * 0.045)/96)*72, 10);
+		basePixelFontSize = Math.floor((baseFontSize/72)*96);
+		baseLineHeight = Math.max(Math.floor(baseFontSize * 1.2), 14);
 		pixelLineHeight = Math.ceil((baseLineHeight/72)*96);
-
+		
 		if (pixelLineHeight * Math.floor(videoMetrics.height / pixelLineHeight) < videoMetrics.height) {
 			pixelLineHeight = Math.floor(videoMetrics.height / Math.floor(videoMetrics.height / pixelLineHeight));
 			baseLineHeight = Math.ceil((pixelLineHeight/96)*72);
 		}
 		
+		
 		cueWidth = availableCueArea.width;
 		cueX = ((availableCueArea.right - cueWidth)/2) + availableCueArea.left;
 		
 		applyStyles(DOMNode,{
+			display: "inline-block",
 			position: "absolute",
 			unicodeBidi: "plaintext",
 			overflow: "hidden",
 			height: pixelLineHeight + "px", //so the scrollheight has a baseline to work from
 			width: cueWidth + "px",
 			left: cueX + "px",
-			padding: Math.floor(videoMetrics.height/100) + "px 0px",
+			padding: "0px " + Math.floor(videoMetrics.width/100) + "px",
 			textAlign: "center",
-			direction: TimedText.getTextDirection(cueObject.text),
+			direction: TimedText.getTextDirection(DOMNode.textContent),
 			lineHeight: baseLineHeight + "pt",
 			boxSizing: "border-box"
 		});	
-
+		
 		cueHeight = Math.round(DOMNode.scrollHeight/pixelLineHeight)*pixelLineHeight;
 		cueY = availableCueArea.height + availableCueArea.top - cueHeight;
 		DOMNode.style.height = cueHeight + "px";
 		DOMNode.style.top = cueY + "px";
-
-		availableCueArea.bottom = cueY;
+		
+		// Work out how to shrink the available render area
+		// If subtracting from the bottom works out to a larger area, subtract from the bottom.
+		// Otherwise, subtract from the top.
+		if ((cueY - 2*availableCueArea.top) >=
+			(availableCueArea.bottom - (cueY + cueHeight)) &&
+			availableCueArea.bottom > cueY) {
+			availableCueArea.bottom = cueY;
+		} else if (availableCueArea.top < cueY + cueHeight) {
+			availableCueArea.top = cueY + cueHeight;
+		}
 		availableCueArea.height = availableCueArea.bottom - availableCueArea.top;
 	}
 	
@@ -152,11 +164,10 @@
 		Provides the interface for interacting with custom render functions.
 	*/
 	function RenderedCue(renderer, cue, track){
-		var i, tname, type,
+		var type,
 			posFn = defaultPosCue,
 			timeFn = defaultKaraokeCheck,
 			contFn = defaultContentCheck,
-			types = Object.keys(TimedText.mime_types),
 			node = null, gc = function(){};
 		
 		this.done = false;
@@ -165,14 +176,11 @@
 		this.properties = {};
 		this.autoPosition = track.kind !== "descriptions" && track.kind !== "metadata";
 		
-		for(i=0;tname=types[i];i++){
-			type = TimedText.mime_types[tname];
-			if(type.isCueCompatible(cue)){
-				posFn = type.positionCue || defaultPosCue;
-				timeFn = type.updateCueTime || defaultKaraokeCheck;
-				contFn = type.updateCueContent || defaultContentCheck;
-				break;
-			}
+		type = TimedText.getCueTypeInfo(cue);
+		if(type){
+			posFn = type.positionCue || defaultPosCue;
+			timeFn = type.updateCueTime || defaultKaraokeCheck;
+			contFn = type.updateCueContent || defaultContentCheck;
 		}
 		
 		this.positionCue = function(availableCueArea, videoMetrics){
