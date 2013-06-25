@@ -3,6 +3,9 @@
 	
 	if(!TimedText){ throw new Error("TimedText not defined."); }
 	
+	var time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*(.*)/;
+	var set_pat = /X1:(\d+)\s+X2:(\d+)\s+Y1:(\d+)\s+Y2:(\d+)\s*/;
+	
 	function SRTCue(start,end,text){
 		TextTrackCue.call(this,start,end,text);
 		this.x1 = null;
@@ -16,13 +19,12 @@
 	Italic - <i> ... </i> or {i} ... {/i}
 	Underline - <u> ... </u> or {u} ... {/u}
 	Font color - <font color="color name or #code"> ... </font> (as in HTML)
-	Nested tags are allowed; some implementations prefer whole-line formatting only.
 	*/
 	
 	function processCueText(text, sanitize){
 		var el = document.createElement('div'),
 			dom = document.createDocumentFragment();
-		el.innerHTML = text;
+		el.innerHTML = text.replace(/\{(\/?[biu])\}/ig,function(m,l){ return "<"+l+">"; });
 		if(sanitize){ el.innerHTML = el.textContent; }
 		[].slice.call(el.childNodes).forEach(dom.appendChild.bind(dom));
 		return dom;
@@ -51,12 +53,10 @@
 	
 	function serialize(cue,index){
 		return (parseInt(cue.id,10)||(index+1))+"\n"
-			+SRTtime(cue.startTime)+" --> "+SRTtime(cue.endTime)
-			+"\n"+cue.text.replace(/(\r?\n)+$/g,"")+"\n\n";
+			+ SRTtime(cue.startTime)+" --> "+SRTtime(cue.endTime)
+			+ (cue.x1 !== null?(" X1:"+cue.x1+" X2:"+cue.x2+" Y1:"+cue.y1+" Y2:"+cue.y2+"\n"):"\n")
+			+ cue.text.replace(/(\r?\n)+$/g,"")+"\n\n";
 	}
-	
-	var time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*(.*)/;
-	var set_pat = /X1:(\d+)\s+X2:(\d+)\s+Y1:(\d+)\s+Y2:(\d+)\s*/;
 
 	function parse_timestamp(input){
 		var ret,p,fields;
@@ -109,6 +109,7 @@
 		cue_list.push(cue);
 		return p;
 	}
+	
 	function parse(input){
 		var line,fields,l,p,id=0,
 			cue_list = [],
@@ -171,10 +172,87 @@
 		}
 	}
 	
+	/* applyStyles(DOMNode, Style Object)
+		A fast way to apply multiple CSS styles to a DOMNode
+		First parameter: DOMNode to style
+		Second parameter: An object where the keys are camel-cased CSS property names
+	*/
+	function applyStyles(Node, styleObject) {
+		var style = Node.style;
+		Object.keys(styleObject).forEach(function(styleName){
+			style[styleName] = styleObject[styleName];
+		});
+	}
+	
+	function positionCue(rendered, availableCueArea, videoMetrics) {
+		var DOMNode = rendered.node,
+			cueObject = rendered.cue,
+			cueX, cueY, cueWidth, cueHeight,
+			baseFontSize, basePixelFontSize, baseLineHeight, pixelLineHeight;
+
+		// Calculate font metrics
+		baseFontSize = Math.max(((videoMetrics.height * 4.5)/96)*72, 10);
+		basePixelFontSize = Math.floor((baseFontSize/72)*96);
+		baseLineHeight = Math.max(Math.floor(baseFontSize * 1.3), 16);
+		pixelLineHeight = Math.ceil((baseLineHeight/72)*96);
+
+		if (pixelLineHeight * Math.floor(videoMetrics.height / pixelLineHeight) < videoMetrics.height) {
+			pixelLineHeight = Math.floor(videoMetrics.height / Math.floor(videoMetrics.height / pixelLineHeight));
+			baseLineHeight = Math.ceil((pixelLineHeight/96)*72);
+		}
+		
+		if(cueObject.x1 === null){
+			cueWidth = availableCueArea.width;
+			cueX = ((availableCueArea.right - cueWidth)/2) + availableCueArea.left;
+			
+			applyStyles(DOMNode,{
+				position: "absolute",
+				unicodeBidi: "plaintext",
+				overflow: "hidden",
+				height: pixelLineHeight + "px", //so the scrollheight has a baseline to work from
+				width: cueWidth + "px",
+				left: cueX + "px",
+				padding: Math.floor(videoMetrics.height/100) + "px 0px",
+				textAlign: "center",
+				direction: TimedText.getTextDirection(""+cueObject.text),
+				lineHeight: baseLineHeight + "pt",
+				boxSizing: "border-box"
+			});	
+
+			cueHeight = Math.round(DOMNode.scrollHeight/pixelLineHeight)*pixelLineHeight;
+			cueY = availableCueArea.height + availableCueArea.top - cueHeight;
+			DOMNode.style.height = cueHeight + "px";
+			DOMNode.style.top = cueY + "px";
+			
+			availableCueArea.bottom = cueY;
+			availableCueArea.height = availableCueArea.bottom - availableCueArea.top;
+		}else{
+			applyStyles(DOMNode,{
+				position: "absolute",
+				unicodeBidi: "plaintext",
+				overflow: "hidden",
+				top: cueObject.y1 + "px",
+				bottom: cueObject.y2 + "px",
+				left: cueObject.x1 + "px",
+				right: cueObject.x2 + "px",
+				padding: Math.floor(videoMetrics.height/100) + "px 0px",
+				textAlign: "center",
+				direction: TimedText.getTextDirection(""+cueObject.text),
+				fontSize: baseFontSize,
+				boxSizing: "border-box"
+			});
+			while(DOMNode.scrollHeight > DOMNode.offsetHeight){
+				baseFontSize = Math.floor(2 * baseFontSize * DOMNode.offsetHeight / DOMNode.scrollHeight)/2;
+				DOMNode.fontSize = baseFontSize + "px";
+			}
+		}
+	}
+	
 	TimedText.mime_types['text/srt'] = {
 		extension: 'srt',
 		name: 'SubRip',
 		cueType: SRTCue,
+		positionCue: positionCue,
 		parse: parse,
 		serialize: function(track){
 			return [].map.call(track.cues,function(cue,index){ return serialize(cue,index); }).join('');

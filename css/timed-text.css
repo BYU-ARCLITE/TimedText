@@ -1,0 +1,34 @@
+.caption-cue-canvas {
+	pointer-events: none;
+	position: absolute;
+	overflow: hidden;
+	box-sizing: border-box;
+	-moz-box-sizing: border-box;
+	color: white;
+	font-family: Verdana, Helvetica, Arial, sans-serif;
+}
+
+/*visually hidden, but accessible to screen readers*/
+.caption-desc-area {
+	pointer-events: none;
+	position: absolute !important;
+	opacity: 0;
+	color: white;
+	font-family: Verdana, Helvetica, Arial, sans-serif;
+}
+
+.caption-cue {
+	pointer-events: auto;
+	overflow: hidden;
+	background-color: rgba(0,0,0,0.5);
+}
+
+.caption-cue span[data-voice]:before {
+	content: attr(data-voice);
+	color: red;
+	margin-right: 0.5em;
+}
+
+.caption-cue q[data-voice]:after {
+	content: "";
+}
