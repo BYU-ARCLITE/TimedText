@@ -6,9 +6,7 @@ http://www.w3.org/TR/ttaf1-dfxp/
 	
 	if(!TimedText){ throw new Error("TimedText not defined."); }
 	
-	function TTMLCue(start, end, text){
-		TextTrackCue.call(this,start,end,text);
-	}
+	var TTMLCue = TimedText.makeCueType(function(){});
 	
 	function processCueText(text){
 		var el = document.createElement('div'),
@@ -30,7 +28,7 @@ http://www.w3.org/TR/ttaf1-dfxp/
 	}
 	
 	function XMLDecode(s) {
-		return s.replace(/<br\/>/g, '\n').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
+		return s.replace(/^\s+|\s+$/,'').replace(/<br\/>/g, '\n').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
 	}
 	
 	function serialize(cue){
@@ -46,8 +44,7 @@ http://www.w3.org/TR/ttaf1-dfxp/
 	}
 	
 	function parse(input){
-		//Not Sure If This Actually Works
-		var DOM = (new DOMParser).parseFromString(input);
+		var DOM = (new DOMParser).parseFromString(input,"application/xml");
 		return {
 			cueList: [].map.call(DOM.getElementsByTagName('p'),function(p){
 				return new TTMLCue(	parseTTMLTime(p.getAttribute('begin')),
@@ -65,6 +62,7 @@ http://www.w3.org/TR/ttaf1-dfxp/
 		name: 'TTML',
 		parse: parse,
 		cueType: TTMLCue,
+		isCueCompatible: function(cue){ return cue instanceof TTMLCue; },
 		serialize: function(track){
 			return "<?xml version='1.0' encoding='UTF-8'?>"
 				+ "<tt xmlns=\"http://www.w3.org/ns/ttml\" xml:lang=\""+track.language+"\"><body><div>"

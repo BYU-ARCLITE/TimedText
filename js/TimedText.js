@@ -115,7 +115,7 @@ TimedText = (function(){
 		serialize: dispatch.bind(null,'serialize'),
 		getPlainText: getPlainText,
 		getTextDirection: getTextDirection,
-		isSupported: function(mime){ return this.mime_types.hasOwnProperty(strip_mime(mime)); },
+		isSupported: function(mime){ return mime_types.hasOwnProperty(strip_mime(mime)); },
 		checkType: assert_support,
 		inferType: inferMime,
 		getTypeInfo: getTypeInfo,
