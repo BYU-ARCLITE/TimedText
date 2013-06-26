@@ -14,20 +14,34 @@
 	
 	var time_pat = /\s*(\d):([0-5]\d):([0-5]\d)\.(\d\d)\s*/;
 
-	var ASSCue = TimedText.makeCueType(function(){});
+	var ASSCue = TimedText.makeCueType(function(){
+		this.wrapStyle = 0;
+	});
 	
-	function processCueText(text, sanitize){
+	//doesn't handle all the modes, because the VTT rendering rules subsume some of them
+	//for now, eliminate all styling; later, implement our own rendering rules
+	function processCueText(text, mode){
 		//replace with actual ASS text processing algorithm
-		var el = document.createElement('div'),
-			dom = document.createDocumentFragment();
-		el.innerHTML = text;
+		var dom = document.createDocumentFragment(),
+			el = document.createElement('span'),
+			newText = text.replace(/\\n|\\N|\\h|(\{\\.*?\})|[<>]/g, function(match){
+				switch(match){
+				case '\\n': return mode === 1?' ':'<br/>';
+				case '\N': return '<br data-hard=1/>';
+				case '\h': return '&nbsp;';
+				case '<': return '&lt;';
+				case '>': return '&gt;';
+				default: return '';
+				}
+			});
+		el.innerHTML = newText;
 		[].slice.call(el.childNodes).forEach(dom.appendChild.bind(dom));
 		return dom;
 	}
 	
 	ASSCue.prototype.getCueAsHTML = function() {
 		if(!this.DOM){
-			this.DOM = processCueText(this.text);
+			this.DOM = processCueText(this.text, this.wrapStyle);
 		}
 		return this.DOM.cloneNode(true);
 	};
@@ -63,17 +77,6 @@
 			+parseInt(match[3],10)
 			+parseInt(match[4],10)/100;
 	}
-	
-	//doesn't handle all the modes, because the VTT rendering rules subsume some of them
-	//for now, eliminate all styling; in the future, translate to VTT text
-	function processText(text,mode){
-		return text.replace(/\\n|\\N|\{\\.*?\}/g,
-			(mode === 1)?function(match){
-				return 	match === '\\N'?'\n':' ';
-			}:function(match){
-				return 	(match === '\\N' || match === '\\n')?'\n':' ';
-			});
-	}
 
 	function parseEventLine(line, fnum){
 		var i, fromIndex = 9, flist = [];
@@ -88,7 +91,7 @@
 	}
 	
 	function parseEvents(globals, lines){
-		var fieldList, n,
+		var fieldList, n, cue,
 			line = lines.pop(),
 			formatMap = {};
 			
@@ -103,11 +106,12 @@
 			if(DialogueLine.test(line)){
 				try{
 					fieldList = parseEventLine(line, n)
-					globals.cuelist.push(new ASSCue(
+					cue = new ASSCue(
 						globals.tmul*parseTimestamp(fieldList[formatMap['Start']])+globals.sync, //startTime
 						globals.tmul*parseTimestamp(fieldList[formatMap['End']])+globals.sync, //endTime
-						processText(fieldList[formatMap['Text']],globals.wrapStyle)
-					));
+						fieldList[formatMap['Text']]);
+					cue.wrapStyle = globals.wrapStyle;
+					globals.cuelist.push(cue);
 				}catch(e){}
 			}else if(FontsHeader.test(line)){
 				return null;
