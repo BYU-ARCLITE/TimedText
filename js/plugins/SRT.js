@@ -36,6 +36,54 @@
 		return this.DOM.cloneNode(true);
 	};
 	
+	//strip out any html that could not have been generated from SRT
+	function formatHTML(node) {
+		var tag, frag;
+		if(node.parentNode === null){ return null; }
+		if(node.nodeType === Node.TEXT_NODE){ return node; }
+		if(node.nodeType === Node.ELEMENT_NODE){
+			tag = node.nodeName.toLowerCase();
+			outer: switch(tag){
+			case "br": case "i": case "u": case "b":
+				frag = document.createElement(tag);
+				break;
+			default:
+				switch(node.childNodes.length){
+				case 1:
+					return formatHTML(node.firstChild);
+				case 0:
+					return null;
+				default:
+					frag = document.createDocumentFragment();
+				}
+			}
+		}
+		[].slice.call(node.childNodes).forEach(function(cnode){
+			var nnode = formatHTML(cnode);
+			if(nnode){ frag.appendChild(nnode); }
+		});
+		return frag;
+	}
+	
+	function HTML2SRT(parent) {
+		return [].map.call(parent.childNodes,function(node){
+			var tag;
+			if(node.nodeType === Node.TEXT_NODE){ return node.nodeValue.replace(/[\r\n]+/g,' '); }
+			if(node.nodeType !== Node.ELEMENT_NODE){ return ""; }
+			tag = node.nodeName.toLowerCase();
+			switch(tag){
+			case "br": return "\r\n";
+			case "div": return "\r\n"+HTML2SRT(node);
+			case "i":
+			case "u":
+			case "b":
+				return "<"+tag+">"+HTML2SRT(node)+"</"+tag+">";
+			default:
+				return HTML2SRT(node);
+			}
+		}).join('');
+	}
+	
 	function SRTtime(time){
 		var seconds = Math.floor(time),
 			minutes = Math.floor(seconds/60),
@@ -263,6 +311,8 @@
 		name: 'SubRip',
 		cueType: SRTCue,
 		isCueCompatible: function(cue){ return cue instanceof SRTCue; },
+		formatHTML: formatHTML,
+		textFromHTML: HTML2SRT,
 		positionCue: positionCue,
 		parse: parse,
 		serialize: function(track){

@@ -194,6 +194,8 @@
 		cueType: ASSCue,
 		parse: parse,
 		isCueCompatible: function(cue){ return cue instanceof ASSCue; },
+		formatHTML: null,
+		textFromHTML: null,
 		serialize:  function(data){
 			if(!(data instanceof Array)){ data = data.cues; }
 			//Don't know if all of the fields are reuired or not; if they are, it may take some finagling to come up with reasonable values

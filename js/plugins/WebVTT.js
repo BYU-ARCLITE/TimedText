@@ -105,29 +105,25 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		return !!textInput.replace(/[^a-z0-9]+/ig,"").length;
 	}
 	
-	function processCaptionHTML(inputHTML,sanitize) {
+	function processCueText(input) {
 		var DOM = document.createDocumentFragment(),
 			current = DOM,
 			stack = [],
 			lang = "";
 		
-		inputHTML
+		input
 			.split(/(<\/?[^>]+>)/ig)
 			.filter(function(cuePortionText) {
 				return !!cuePortionText.replace(/\s*/ig,"");
 			}).forEach(function(token) {
 			var tag, chunk, node, frags;
 			if (token[0] !== "<") { // Text string
-				if(sanitize){
-					frags = token.replace(/\n\r/g,'\n').split(/\n(?!$)/g);
-					frags.forEach(function(frag){
-						current.appendChild(document.createTextNode(frag));
-						current.appendChild(document.createElement('br'));
-					});
-					current.removeChild(current.lastChild);
-				}else{
-					current.appendChild(document.createTextNode(token));
-				}
+				frags = token.replace(/\n\r/g,'\n').split(/\n(?!$)/g);
+				frags.forEach(function(frag){
+					current.appendChild(document.createTextNode(frag));
+					current.appendChild(document.createElement('br'));
+				});
+				current.removeChild(current.lastChild);
 			}else if (token[1] === "/") { //Closing tag
 				tag = token.match(/<\/([^\s>]+)/)[1].toUpperCase();
 				if(tag === current.nodeName || (current.dataset && tag === current.dataset.cuetag)){
@@ -155,7 +151,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 					node.dataset.cuetag = "LANG";
 					stack.push(lang);
 					lang = chunk[1];
-				}else if(chunk = token.match(sanitize?/<(b|i|u|ruby|rt)>/:/<(\w+)>/)){
+				}else if(chunk = token.match(/<(b|i|u|ruby|rt)>/)){
 					node = document.createElement(chunk[1]);
 				}else{
 					return;
@@ -170,10 +166,85 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	
 	WebVTTCue.prototype.getCueAsHTML = function() {
 		if(!this.DOM){
-			this.DOM = processCaptionHTML(this.text,!(this.track && this.track.kind === 'html'));
+			this.DOM = processCueText(this.text);
 		}
 		return this.DOM.cloneNode(true);
 	};
+	
+	//strip out any html that could not have been generated from VTT
+	function formatHTML(node) {
+		var tag, frag;
+		if(node.parentNode === null){ return null; }
+		if(node.nodeType === Node.TEXT_NODE){ return node; }
+		if(node.nodeType === Node.ELEMENT_NODE){
+			tag = node.nodeName.toLowerCase();
+			outer: switch(tag){
+			case "i":
+				frag = document.createElement('i');
+				if(node["data-target"] === "timestamp"){
+					frag["data-target"] = "timestamp";
+					frag["data-timestamp"] = node["data-timestamp"];
+					frag["data-seconds"] = node["data-seconds"];
+				}
+				break;
+			case "br": case "u": case "b": case "ruby": case "rt":
+				frag = document.createElement(tag);
+				break;
+			case "span":
+				switch(node['data-cuetag']){
+				case "V": case "C": case "LANG":
+					frag = document.createElement(tag);
+					frag["data-cuetag"] = node["data-cuetag"];
+					break outer;
+				}
+			default:
+				switch(node.childNodes.length){
+				case 1:
+					return formatHTML(node.firstChild);
+				case 0:
+					return null;
+				default:
+					frag = document.createDocumentFragment();
+				}
+			}
+		}
+		[].slice.call(node.childNodes).forEach(function(cnode){
+			var nnode = formatHTML(cnode);
+			if(nnode){ frag.appendChild(nnode); }
+		});
+		return frag;
+	}
+	
+	function HTML2VTT(parent) {
+		return [].map.call(parent.childNodes,function(node){
+			var tag;
+			if(node.nodeType === Node.TEXT_NODE){ return node.nodeValue.replace(/[\r\n]+/g,' '); }
+			if(node.nodeType !== Node.ELEMENT_NODE){ return ""; }
+			tag = node.nodeName.toLowerCase();
+			switch(tag){
+			case "br": return "\r\n";
+			case "div": return "\r\n"+HTML2VTT(node);
+			case "i":
+				return (node["data-target"] === "timestamp")
+						?node["data-timestamp"]
+						:("<i>"+HTML2VTT(node)+"</i>");
+			default:
+				return HTML2VTT(node);
+			case "u":
+			case "b":
+			case "ruby":
+			case "rt":
+				return "<"+tag+">"+HTML2VTT(node)+"</"+tag+">";
+			case "span":
+				switch(node['data-cuetag']){
+				case "V": return "<v "+node['data-voice']+">"+HTML2VTT(node)+"</v>";
+				case "C": return "<c."+node.className.replace(/ /g,'.')+">"+HTML2VTT(node)+"</c>";
+				case "LANG": return "<lang "+node.lang+">"+HTML2VTT(node)+"</lang>";
+				default: return HTML2VTT(node); //ignore unrecognized tags
+				}
+			}
+		}).join('');
+	}
 	
 	//var WebVTTDEFAULTSCueParser		= /^DEFAULTS?\s+\-\-\>\s+(.*)/g;
 	//var WebVTTSTYLECueParser		= /^STYLES?\s+\-\-\>\s*\n([\s\S]*)/g;
@@ -652,6 +723,8 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		name: 'WebVTT',
 		cueType: WebVTTCue,
 		isCueCompatible: function(cue){ return cue instanceof WebVTTCue; },
+		formatHTML: formatHTML,
+		textFromHTML: HTML2VTT,
 		positionCue: positionCue,
 		updateCueTime: updateCueTime,
 		//updateCueContent: updateCueContent, just use default

@@ -77,6 +77,16 @@ TimedText = (function(){
 		return null;
 	}
 	
+	function isTypeEditable(mime){
+		var type = mime_types[strip_mime(mime)];
+		return type?(typeof type.formatHTML === 'function' && typeof type.textFromHTML === 'function'):false;
+	}
+	
+	function isCueEditable(cue){
+		var type = getCueTypeInfo(cue);
+		return type?(typeof type.formatHTML === 'function' && typeof type.textFromHTML === 'function'):false;
+	}
+	
 	function inferMime(name){
 		var mime, ext;
 		for(mime in mime_types){
@@ -88,7 +98,9 @@ TimedText = (function(){
 	}
 	
 	function dispatch(method, mime, data){
-		return mime_types[assert_support(mime)][method](data);
+		var fn = mime_types[assert_support(mime)][method];
+		if(typeof fn !== 'function'){ throw new Error(method +" Not Implemented for "+mime); }
+		return fn(data);
 	}
 
 	function merge_objects(obj1, obj2){
@@ -113,9 +125,13 @@ TimedText = (function(){
 		getRegisteredTypes: function(){ return Object.keys(mime_types); },
 		parse: dispatch.bind(null,'parse'),
 		serialize: dispatch.bind(null,'serialize'),
+		formatHTML: dispatch.bind(null,'formatHTML'),
+		textFromHTML: dispatch.bind(null,'textFromHTML'),
 		getPlainText: getPlainText,
 		getTextDirection: getTextDirection,
 		isSupported: function(mime){ return mime_types.hasOwnProperty(strip_mime(mime)); },
+		isCueEditable: isCueEditable,
+		isTypeEditable: isTypeEditable,
 		checkType: assert_support,
 		inferType: inferMime,
 		getTypeInfo: getTypeInfo,

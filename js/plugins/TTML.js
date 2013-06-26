@@ -177,6 +177,8 @@ http://www.w3.org/TR/ttaf1-dfxp/
 		parse: parse,
 		cueType: TTMLCue,
 		isCueCompatible: function(cue){ return cue instanceof TTMLCue; },
+		formatHTML: null,
+		textFromHTML: null,
 		serialize: function(track){
 			return "<?xml version='1.0' encoding='UTF-8'?>"
 				+ "<tt xmlns=\"http://www.w3.org/ns/ttml\" xml:id=\""+track.label+"\" xml:lang=\""+track.language+"\"><body><div>"

@@ -168,6 +168,7 @@
 			posFn = defaultPosCue,
 			timeFn = defaultKaraokeCheck,
 			contFn = defaultContentCheck,
+			editable = TimedText.isCueEditable(cue),
 			node = null, gc = function(){};
 		
 		this.done = false;
@@ -201,6 +202,7 @@
 		
 		Object.defineProperties(this,{
 			cue: { get: function(){ return cue; }, enumerable: true },
+			editable: { get: function(){ return editable; }, enumerable: true },
 			renderer: { get: function(){ return renderer; }, enumerable: true },
 			kind: { get: function(){ return track.kind; }, enumerable: true },
 			mode: { get: function(){ return track.mode; }, enumerable: true },
