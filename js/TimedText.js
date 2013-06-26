@@ -44,8 +44,12 @@ TimedText = (function(){
 		return mime_types[assert_support(mime)].cueType;
 	}
 	
+	function getPlainText(cue){
+		return [].map.call(cue.getCueAsHTML().childNodes,function(n){ return n.textContent; }).join('');
+	}
+	
 	function defaultConverter(cue){
-		return new this(cue.startTime, cue.endTime, cue.text);
+		return new this(cue.startTime, cue.endTime, getPlainText(cue));
 	}
 	
 	function getCueConverter(from, to){
@@ -85,10 +89,6 @@ TimedText = (function(){
 	
 	function dispatch(method, mime, data){
 		return mime_types[assert_support(mime)][method](data);
-	}
-	
-	function getPlainText(cue){
-		return [].map.call(cue.getCueAsHTML().childNodes,function(n){ return n.textContent; }).join('');
 	}
 
 	function merge_objects(obj1, obj2){

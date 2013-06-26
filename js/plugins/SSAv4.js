@@ -7,16 +7,14 @@
 	var EventsHeader = /^\[Events\]\s*/;
 	var FontsHeader = /^\[Fonts\]\s*/;
 	var GraphicsHeader = /^\[Graphics\]\s*/;
-	var DialogLine = /^Dialogue:.*/;
+	var DialogueLine = /^Dialogue:.*/;
 	var TimerLine = /^Timer:.*/;
 	var SyncLine = /^Sync Point:.*/;
 	var WrapLine = /^WrapStyle:.*/;
 	
-	var time_pat = /\s*(\d):([0-5]\d):([0-5]\d):(\d\d)\s*/;
+	var time_pat = /\s*(\d):([0-5]\d):([0-5]\d)\.(\d\d)\s*/;
 
-	function ASSCue(start,end,text){
-		TextTrackCue.call(this,start,end,text);
-	}
+	var ASSCue = TimedText.makeCueType(function(){});
 	
 	function processCueText(text, sanitize){
 		//replace with actual ASS text processing algorithm
@@ -80,9 +78,9 @@
 	function parseEventLine(line, fnum){
 		var i, fromIndex = 9, flist = [];
 		for(;fnum > 1; fnum--){
-			i = line.indexOf(",". fromIndex)+1;
+			i = line.indexOf(",", fromIndex)+1;
 			if(i === -1){ throw new Error(); }
-			flist.push(line.substring(fromIndex,i);
+			flist.push(line.substring(fromIndex,i-1));
 			fromIndex = i;
 		}
 		flist.push(line.substr(fromIndex));
@@ -105,10 +103,10 @@
 			if(DialogueLine.test(line)){
 				try{
 					fieldList = parseEventLine(line, n)
-					globals.cuelist.push(new TextTrackCue(
-						globals.timer*parseTimestamp(fieldList[formatMap['Start']])+globals.sync, //startTime
-						globals.timer*parseTimestamp(fieldList[formatMap['End']])+globals.sync, //endTime
-						processText(fieldList[formatMap['Text']]],globals.wrapStyle)
+					globals.cuelist.push(new ASSCue(
+						globals.tmul*parseTimestamp(fieldList[formatMap['Start']])+globals.sync, //startTime
+						globals.tmul*parseTimestamp(fieldList[formatMap['End']])+globals.sync, //endTime
+						processText(fieldList[formatMap['Text']],globals.wrapStyle)
 					));
 				}catch(e){}
 			}else if(FontsHeader.test(line)){
@@ -137,13 +135,13 @@
 		while(line = lines.pop()){
 			if(SyncLine.test(line)){
 				globals.sync = parseTimeCode(line.substr(11));
-			}else if(TimerLine.test(line){
+			}else if(TimerLine.test(line)){
 				globals.tmul = (parseFloat(line.substr(6))||100)/100;
-			}else if(WrapLine.test(line){
+			}else if(WrapLine.test(line)){
 				globals.wrapStyle = Math.max(parseInt(line.substr(10),10),0);
 				if(globals.wrapStyle > 3){ globals.wrapStyle = 0; }
 			}else if(StyleHeader.test(line)){
-				return return parseStyles;
+				return parseStyles;
 			}
 		}
 		return null;
@@ -165,11 +163,14 @@
 		l = p = +(input[0] === '\uFEFF');
 		//Collect a sequence of chars that are not CR or LF.
 		while(p < len && input[p] !== '\r' && input[p] !== '\n'){p++;}
-		if(!/^\[Script Info\]\s*$)/.test(line)){throw new Error("Not WebVTT Data");}
+		line = input.substring(l,p);
+		if(!/^\[Script Info\]\s*$/.test(line)){throw new Error("Not SSA Data");}
 		
 		//If position is past the end of input, end.
 		if(p >= len){return [];}
-		lines = input.substr(line.length).split(/(\r*\n+)+/g);
+		lines = input.substr(line.length).split(/(\r*\n+)+/g).filter(function(l){
+			return !/^\s*(;.*)?$/.test(l);
+		});
 		lines.reverse();
 		
 		while(typeof section === 'function'){
@@ -188,6 +189,7 @@
 		name: 'Sub Station Alpha',
 		cueType: ASSCue,
 		parse: parse,
+		isCueCompatible: function(cue){ return cue instanceof ASSCue; },
 		serialize:  function(data){
 			if(!(data instanceof Array)){ data = data.cues; }
 			//Don't know if all of the fields are reuired or not; if they are, it may take some finagling to come up with reasonable values
