@@ -46,7 +46,7 @@
 		return this.DOM.cloneNode(true);
 	};
 	
-	function SSAtime(time){
+	function SSATime(time){
 		var seconds = Math.floor(time),
 			minutes = Math.floor(seconds/60),
 			hh,mm,ss,cs,text;
@@ -66,7 +66,7 @@
 	}
 	
 	function serializeCue(cue, stylename){
-		return "Marked=0,"+SSATime(cue.startTime)+","+SSATime(cue.startTime)+","+stylename+","+escapeText(cue.text)+"\n";
+		return "Dialogue: "+SSATime(cue.startTime)+","+SSATime(cue.endTime)+","+stylename+","+escapeText(cue.text)+"\n";
 	}
 	
 	function parseTimestamp(time){
@@ -79,7 +79,7 @@
 	}
 
 	function parseEventLine(line, fnum){
-		var i, fromIndex = 9, flist = [];
+		var i, fromIndex = 10, flist = [];
 		for(;fnum > 1; fnum--){
 			i = line.indexOf(",", fromIndex)+1;
 			if(i === -1){ throw new Error(); }
@@ -98,8 +98,8 @@
 		while(line && line.substr(0,7) !== "Format:"){ line = lines.pop(); }
 		if(!lines.length){ return; }
 		
-		fieldList = line.substr(7).split(/\s*,\s*/g);
-		fieldList.forEach(function(field, index){ formatMap[field] = index; });
+		fieldList = line.substr(7).split(',');
+		fieldList.forEach(function(field, index){ formatMap[/^\s*(.*?)\s*$/.exec(field)[1]] = index; });
 		n = fieldList.length;
 		
 		while(line = lines.pop()){
@@ -194,14 +194,18 @@
 		cueType: ASSCue,
 		parse: parse,
 		isCueCompatible: function(cue){ return cue instanceof ASSCue; },
-		formatHTML: null,
-		textFromHTML: null,
+		formatHTML: function(node){
+			if(node.parentNode === null){ return null; }
+			if(node.nodeType === Node.TEXT_NODE){ return node; }
+			return document.createTextNode(node.textContent);
+		},
+		textFromHTML: function(node){ return node.textContent; },
 		serialize:  function(data){
 			if(!(data instanceof Array)){ data = data.cues; }
 			//Don't know if all of the fields are reuired or not; if they are, it may take some finagling to come up with reasonable values
 			return "[Script Info]\nScriptType: v4.00+\nCollisions: Normal\nPlayResY: 600\nPlayResX: 800\nTimer: 100.0000\nWrapStyle:0\n\n"
 			+"[V4+ Styles]\nFormat: Name, Fontname\nStyle: DefaultStyle, Arial\n\n"
-			+"[Events]\nFormat: Marked,Start,End,Style,Text\n"
+			+"[Events]\nFormat: Start,End,Style,Text\n"
 			+data.map(function(cue){ return serializeCue(cue,"DefaultStyle"); }).join('');
 		}
 	});
