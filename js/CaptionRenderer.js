@@ -11,7 +11,7 @@
 			width: The calculated width of the display
 	*/
 	function getDisplayMetrics(renderer) {
-		var UA, offsetObject = renderer.element,
+		var UA, offsetObject = renderer.target,
 			nodeComputedStyle = window.getComputedStyle(offsetObject,null),
 			offsetTop = 0, offsetLeft = 0, controlHeight = 0;
 		
@@ -251,16 +251,10 @@
 		}
 	};
 	
-	/* CaptionRenderer([dom element],
-						[options - JS Object])
-	
-		Adds closed captions to video elements. The first, second and third parameter are both optional.
-		First parameter: Use an array of either DOMElements or selector strings (compatible with querySelectorAll.)
-		All of these elements will be captioned if tracks are available. If this parameter is omitted, all video elements
-		present in the DOM will be captioned if tracks are available.
+	/* CaptionRenderer([options - JS Object])
 	*/
-	function CaptionRenderer(element,options) {
-		if(!(this instanceof CaptionRenderer)){ return new CaptionRenderer(element,options); }
+	function CaptionRenderer(options) {
+		if(!(this instanceof CaptionRenderer)){ return new CaptionRenderer(options); }
 		options = options instanceof Object? options : {};
 		var media, renderer = this, internalTime = 0,
 			timeupdate = function(){ renderer.currentTime = (media?media.currentTime:0) || 0; },
@@ -269,6 +263,7 @@
 			descriptorId = "description-display-"+(Math.random()*9999).toString(16),
 			appendCueCanvasTo = (options.appendCueCanvasTo instanceof HTMLElement)?options.appendCueCanvasTo:document.body,
 			renderCue = typeof options.renderCue === 'function'?options.renderCue:defaultRenderCue,
+			target = options.target instanceof HTMLElement ? options.target : null,
 			showDescriptions = !!options.showDescriptions;
 
 		container.className = "caption-cue-canvas";
@@ -281,24 +276,56 @@
 		appendCueCanvasTo.appendChild(container);
 		appendCueCanvasTo.appendChild(descriptor);
 		
-		element.setAttribute("aria-describedby",element.hasAttribute("aria-describedby") ? element.getAttribute("aria-describedby") + " " + descriptorId : descriptorId);
+		if(target){
+			target.setAttribute("aria-describedby",target.hasAttribute("aria-describedby") ? target.getAttribute("aria-describedby") + " " + descriptorId : descriptorId);
+			target.classList.add("captioned");
+		}
 		
 		this.container = container;
 		this.descriptor = descriptor;
 		this.tracks = [];
-		this.element = element;
 		this.renderedCues = [];
-		
-		element.classList.add("captioned");
 		
 		window.addEventListener("resize", this.refreshLayout.bind(this) ,false);
 		this.bindMediaElement = function(element) {
-			if(media){ media.removeEventListener('timeupdate',timeupdate,false); }
+			if(media && typeof media.removeEventListener === 'function'){ media.removeEventListener('timeupdate',timeupdate,false); }
 			media = element;
-			if(media){ media.addEventListener('timeupdate',timeupdate,false); }
+			if(media){
+				if(typeof media.addEventListener === 'function'){ media.addEventListener('timeupdate',timeupdate,false); }
+				this.currentTime = media.currentTime || 0;
+			}
 		};
 		
 		Object.defineProperties(this,{
+			target: {
+				get: function(){ return target; },
+				set: function(el){
+					var i, descstr, wasoff = !target;
+					if(!(el instanceof HTMLElement || el !== null) || target === el){ return target; }
+					if(target){
+						target.classList.remove("captioned");
+						descstr = target.getAttribute("aria-describedby");
+						if(descstr === descriptorId){
+							target.removeAttribute("aria-describedby");
+						}else{
+							i = descstr.indexOf(descriptorId);
+							if(i === 0){ target.setAttribute("aria-describedby", descstr.substring(descriptorId.length)); }
+							else if(i !== -1){ target.setAttribute("aria-describedby", descstr.substring(0, i-1)+descstr.substring(i+descriptorId.length)); }
+						}
+					}
+					target = el;
+					if(el){
+						el.setAttribute("aria-describedby",el.hasAttribute("aria-describedby") ? el.getAttribute("aria-describedby") + " " + descriptorId : descriptorId);
+						el.classList.add("captioned");
+						if(wasoff){ this.rebuildCaptions(); }
+						else{ this.refreshLayout(); }
+					}else{
+						container.style.opacity = 0;
+						descriptor.style.opacity = 0;
+					}
+					return target;
+				}
+			},
 			currentTime: {
 				get: function(){ return internalTime; },
 				set: function(time){
@@ -313,7 +340,11 @@
 			appendCueCanvasTo: {
 				get: function(){ return appendCueCanvasTo; },
 				set: function(val){
-					appendCueCanvasTo = (val instanceof HTMlElement)?val:null;
+					if(!(val instanceof HTMLElement)){ val = document.body; }
+					if(appendCueCanvasTo === val){ return val; }
+					appendCueCanvasTo = val;
+					appendCueCanvasTo.appendChild(container);
+					appendCueCanvasTo.appendChild(descriptor);
 					this.refreshLayout();
 					return appendCueCanvasTo;
 				},
@@ -419,6 +450,7 @@
 			});
 		}
 		
+		if(!this.target){ return; }
 
 		// If needed, redraw
 		if(dirtyBit){
@@ -497,6 +529,7 @@
 	};
 	
 	CaptionRenderer.prototype.refreshLayout = function() {
+		if(!this.target){ return; }
 		var renderer = this, area,
 			container = this.container,
 			descriptor = this.descriptor,
