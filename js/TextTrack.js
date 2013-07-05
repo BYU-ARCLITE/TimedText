@@ -192,7 +192,7 @@ TextTrackCueList.prototype.addCue = function(cue) {
 	var i,tcue;
 	if (cue && cue instanceof TextTrackCue) {
 		if (cue.track === this.track || !cue.track) {
-			if(this.indexOf(cue) !== -1){ return; }
+			if(~this.indexOf(cue)){ return; }
 			cue.track = this.track;
 			for(i=0;tcue=this[i];i++){
 				if(tcue.startTime > cue.startTime || (tcue.startTime === cue.startTime && tcue.endTime > cue.endTime)){

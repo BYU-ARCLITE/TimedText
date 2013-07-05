@@ -21,12 +21,12 @@
 			// Get heights of default control strip in various browsers
 			// There could be a way to measure this live but I haven't thought/heard of it yet...
 			UA = navigator.userAgent.toLowerCase();
-			controlHeight =	(UA.indexOf("chrome") !== -1)?35:
-							(UA.indexOf("opera") !== -1)?25:
-							(UA.indexOf("firefox") !== -1)?28:
-							(UA.indexOf("ie 9") !== -1)?44:
-							(UA.indexOf("ipad") !== -1)?44:
-							(UA.indexOf("safari") !== -1)?25:
+			controlHeight =	~UA.indexOf("chrome")?35:
+							~UA.indexOf("opera")?25:
+							~UA.indexOf("firefox")?28:
+							~UA.indexOf("ie 9")?44:
+							~UA.indexOf("ipad")?44:
+							~UA.indexOf("safari")?25:
 							0;
 		}
 		

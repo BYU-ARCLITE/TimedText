@@ -34,7 +34,7 @@
 		this.removeEventListener = function(type, listener, useCapture){
 			var handlers = events[type]||[],
 				idx = handlers.indexOf(listener);
-			if(idx !== -1){ handlers.splice(idx,1); }
+			if(~idx){ handlers.splice(idx,1); }
 		};
 		this.dispatchEvent = function(evt) {
 			(events[evt.type]||[]).forEach(function(listener){ listener(evt); });
