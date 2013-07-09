@@ -20,27 +20,32 @@
 		this.track = null;
 		this.id = "";
 		this.pauseOnExit = false;
-		this.DOM = null;
-		
-		this.addEventListener = function(type, listener, useCapture){
-			var handlers = events[type];
-			if(!handlers){
-				handlers = events[type] = [];
-			}
-			if(handlers.indexOf(listener) === -1){
-				handlers.push(listener);
-			}
-		};
-		this.removeEventListener = function(type, listener, useCapture){
-			var handlers = events[type]||[],
-				idx = handlers.indexOf(listener);
-			if(~idx){ handlers.splice(idx,1); }
-		};
-		this.dispatchEvent = function(evt) {
-			(events[evt.type]||[]).forEach(function(listener){ listener(evt); });
-		};
 		
 		Object.defineProperties(this,{
+			DOM: { value: null, writable: true },
+			addEventListener: {
+				value: function(type, listener, useCapture){
+					var handlers = events[type];
+					if(!handlers){
+						handlers = events[type] = [];
+					}
+					if(handlers.indexOf(listener) === -1){
+						handlers.push(listener);
+					}
+				}
+			},
+			removeEventListener: {
+				value: function(type, listener, useCapture){
+					var handlers = events[type]||[],
+						idx = handlers.indexOf(listener);
+					if(~idx){ handlers.splice(idx,1); }
+				}
+			},
+			dispatchEvent: {
+				value: function(evt) {
+					(events[evt.type]||[]).forEach(function(listener){ listener(evt); });
+				}
+			},
 			text: {
 				set: function(t){
 					this.DOM = null;

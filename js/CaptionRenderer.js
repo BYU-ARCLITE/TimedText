@@ -195,13 +195,13 @@
 		};
 		
 		this.updateContent = function(){
-			var dirty = contFn(this);
-			this.dirty = dirty;
-			return dirty;
+			this.dirty = contFn(this);
+			return this.dirty;
 		};
 		
 		Object.defineProperties(this,{
 			cue: { get: function(){ return cue; }, enumerable: true },
+			typeInfo: { get: function(){ return type; }, enumerable: true},
 			editable: { get: function(){ return editable; }, enumerable: true },
 			renderer: { get: function(){ return renderer; }, enumerable: true },
 			kind: { get: function(){ return track.kind; }, enumerable: true },
