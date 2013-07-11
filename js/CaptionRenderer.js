@@ -172,32 +172,10 @@
 			node = null, gc = function(){};
 		
 		this.done = false;
-		this.dirty = false;
+		this.dirty = true;
 		this.time = "";
 		this.properties = {};
 		this.autoPosition = track.kind !== "descriptions" && track.kind !== "metadata";
-		
-		type = TimedText.getCueTypeInfo(cue);
-		if(type){
-			posFn = type.positionCue || defaultPosCue;
-			timeFn = type.updateCueTime || defaultKaraokeCheck;
-			contFn = type.updateCueContent || defaultContentCheck;
-		}
-		
-		this.positionCue = function(availableCueArea, videoMetrics){
-			if(!this.autoPosition || !this.visible){ return; }
-			posFn(this, availableCueArea, videoMetrics);
-		};
-		
-		this.updateTime = function(time){
-			if(!(this.node instanceof HTMLElement)){ return false; }
-			return timeFn(this,time);
-		};
-		
-		this.updateContent = function(){
-			this.dirty = contFn(this);
-			return this.dirty;
-		};
 		
 		Object.defineProperties(this,{
 			cue: { get: function(){ return cue; }, enumerable: true },
@@ -241,7 +219,29 @@
 			}
 		});
 		
-		this.updateContent();
+		type = TimedText.getCueTypeInfo(cue);
+		if(type){
+			posFn = type.positionCue || defaultPosCue;
+			timeFn = type.updateCueTime || defaultKaraokeCheck;
+			contFn = type.updateCueContent || defaultContentCheck;
+		}
+		
+		this.positionCue = function(availableCueArea, videoMetrics){
+			if(!this.autoPosition || !this.visible){ return; }
+			posFn(this, availableCueArea, videoMetrics);
+		};
+		
+		this.updateTime = function(time){
+			if(!(this.node instanceof HTMLElement)){ return false; }
+			return timeFn(this,time);
+		};
+		
+		this.updateContent = function(){
+			this.dirty = contFn(this);
+			return this.dirty;
+		};
+		
+		contFn(this);
 	}
 
 	RenderedCue.prototype.cleanup = function(){
@@ -475,7 +475,7 @@
 			activeCues.forEach(function(rendered){
 				var node, kind = rendered.kind;
 				
-				if(!rendered.done || rendered.dirty){
+				if(rendered.dirty){
 					renderCue(rendered,area,
 						function(){ defaultRenderCue(rendered,area); });
 					rendered.done = true;
@@ -509,7 +509,7 @@
 			videoMetrics = getDisplayMetrics(this);
 			styleCueContainer(this,videoMetrics);
 			
-			this.availableCueArea = {
+			area = {
 				"top": 0, "left": 0,
 				"bottom": videoMetrics.height,
 				"right": videoMetrics.width,
