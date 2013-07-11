@@ -169,7 +169,7 @@
 			timeFn = defaultKaraokeCheck,
 			contFn = defaultContentCheck,
 			editable = TimedText.isCueEditable(cue),
-			node = null, gc = function(){};
+			node = null, gclist = [];
 		
 		this.done = false;
 		this.dirty = true;
@@ -196,14 +196,6 @@
 					return node;
 				},
 				get: function(){ return node; },
-				enumerable: true
-			},
-			collector: {
-				set: function(collector){
-					gc = typeof collector === 'function'?collector:function(){};
-					return gc;
-				},
-				get: function(){ return gc; },
 				enumerable: true
 			},
 			visible: {
@@ -241,15 +233,26 @@
 			return this.dirty;
 		};
 		
+		this.addFinalizer = function(fn){
+			if(typeof fn !== 'function'){ return; }
+			gclist.push(fn);
+		};
+		
+		this.removeFinalizer = function(fn){
+			var idx = gclist.indexOf(fn);
+			if(~idx){ gclist.splice(idx,1); }
+		};
+		
+		this.cleanup = function(){
+			var that = this;
+			gclist.forEach(function(fn){ fn.call(that); });
+			if(this.node && this.node.parentNode){
+				this.node.parentNode.removeChild(this.node);
+			}
+		};
+		
 		contFn(this);
 	}
-
-	RenderedCue.prototype.cleanup = function(){
-		this.collector();
-		if(this.node && this.node.parentNode){
-			this.node.parentNode.removeChild(this.node);
-		}
-	};
 	
 	/* CaptionRenderer([options - JS Object])
 	*/

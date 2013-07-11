@@ -718,6 +718,18 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		};
 	}());
 	
+	function attachEditor(renderedCue, edit){
+		switch(renderedCue.kind){
+		case 'chapters':
+		case 'descriptions':
+		case 'metadata':
+		case 'subtitles': break;
+		case 'captions':
+			renderedCue.addFinalizer(function(){ console.log('closed caption'); });
+			break;
+		}
+	}
+	
 	TimedText.registerType('text/vtt',{
 		extension: 'vtt',
 		name: 'WebVTT',
@@ -728,6 +740,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		positionCue: positionCue,
 		updateCueTime: updateCueTime,
 		//updateCueContent: updateCueContent, just use default
+		attachEditor: attachEditor,
 		parse: parse,
 		serialize: function(track){
 			return "WEBVTT\r\n\r\n"+[].map.call(track.cues,function(cue){ return serialize(cue); }).join('');
