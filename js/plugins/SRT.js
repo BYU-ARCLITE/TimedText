@@ -200,7 +200,7 @@
 				
 				//Collect SRT cue timings
 				if(fields = time_pat.exec(line)){
-					p = add_cue(p,input,++id,fields,cue_list);
+					p = add_cue(p,input,String(++id),fields,cue_list);
 				}else{ //Bad cue loop:
 					do{	crlf();
 						collect_line();

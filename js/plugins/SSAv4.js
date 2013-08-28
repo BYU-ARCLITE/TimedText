@@ -202,7 +202,7 @@
 		textFromHTML: function(node){ return node.textContent; },
 		serialize:  function(data){
 			if(!(data instanceof Array)){ data = data.cues; }
-			//Don't know if all of the fields are reuired or not; if they are, it may take some finagling to come up with reasonable values
+			//Don't know if all of the fields are required or not; if they are, it may take some finagling to come up with reasonable values
 			return "[Script Info]\nScriptType: v4.00+\nCollisions: Normal\nPlayResY: 600\nPlayResX: 800\nTimer: 100.0000\nWrapStyle:0\n\n"
 			+"[V4+ Styles]\nFormat: Name, Fontname\nStyle: DefaultStyle, Arial\n\n"
 			+"[Events]\nFormat: Start,End,Style,Text\n"
