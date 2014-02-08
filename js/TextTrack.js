@@ -86,14 +86,15 @@ var TextTrack = (function(){
 	TextTrack.prototype.addCue = function(cue) { this.cues.addCue(cue);	};
 	TextTrack.prototype.removeCue = function(cue) { this.cues.removeCue(cue); };
 	
-	TextTrack.parse = function(params){ //content, mime, kind, label, lang
-		var track, trackData, name = params.label,
-			mime = (typeof(params.mime) === "string" && params.mime)?params.mime:TimedText.inferType(name);
+	TextTrack.parse = function(params){ //content, file name, mime, kind, label, lang
+		var track, trackData,
+			fname = (typeof(params.fname) === "string" ? params.fname : ""),
+			mime = (typeof(params.mime) === "string" && params.mime)?params.mime:TimedText.inferType(fname);
 		try{
 			trackData = TimedText.parse(mime, params.content);
 			track = new TextTrack(
 				typeof(params.kind) === "string" ? params.kind : trackData.kind,
-				TimedText.removeExt(mime, name),
+				typeof(params.label) === "string" ? params.label : TimedText.removeExt(mime, fname),
 				typeof(params.lang) === "string" ? params.lang : trackData.lang
 			);
 			track.cues.loadCues(trackData.cueList);
