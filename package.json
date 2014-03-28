@@ -1,5 +1,5 @@
 {
-  "name": "TimedText",
+  "name": "timed-text",
   "version": "0.1.0",
   "author": "BYU-ARCLITE",
   "description": "Parsers and serializers for caption/subtitle formats"
