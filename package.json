@@ -2,5 +2,9 @@
   "name": "timed-text",
   "version": "0.1.0",
   "author": "BYU-ARCLITE",
-  "description": "Parsers and serializers for caption/subtitle formats"
+  "description": "Parsers and serializers for caption/subtitle formats",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BYU-ARCLITE/Ayamel.js.git"
+  }
 }
