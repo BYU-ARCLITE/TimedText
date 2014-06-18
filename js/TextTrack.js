@@ -100,15 +100,17 @@ var TextTrack = (function(){
 			track.cues.loadCues(trackData.cueList);
 			track.readyState = TextTrack.LOADED;
 			track.activeCues.refreshCues();
-			if(params.success instanceof Function){ params.success.call(null,track,mime); }
+			if(params.success instanceof Function){ setTimeout(params.success.bind(null,track,mime),0); }
 		}catch(e){
-			if(params.error instanceof Function){ params.error(e); }
+			if(params.error instanceof Function){ setTimeout(params.error.bind(null,e),0); }
 			else{ alert("The track could not be loaded: " + e.message); }
 		}
+		return track;
 	};
 	
-	TextTrack.get = function(params){ //url|file, kind, label, lang
-		var source, reader, track;
+	TextTrack.get = function(params){ //src, kind, label, lang
+		var source = params.src,
+			reader, track;
 		
 		track = new TextTrack(
 			typeof params.kind === "string" ? params.kind : "",
@@ -120,28 +122,27 @@ var TextTrack = (function(){
 		
 		function load(trackData,mime){
 			if(!track.kind){ track.kind = trackData.kind; }
-			if(!track.kind){ track.kind = trackData.kind; }
+			if(!track.language){ track.language = trackData.language; }
+			if(!track.label){ track.label = trackData.label; }
 				
 			track.cues.loadCues(trackData.cueList);
 			track.activeCues.refreshCues();
 			track.readyState = TextTrack.LOADED;
 			track.onload();
-			if(typeof params.success === 'function'){ params.success.call(null,track,mime); }
+			if(typeof params.success === 'function'){ setTimeout(params.success.bind(null,track,mime),0); }
 		}
 		
-		if(params.file instanceof File){
-			source = params.file;
+		if(source instanceof File){
 			reader = new FileReader();
 			reader.onerror = params.error;
 			reader.onload = function(evt) {
 				var mime = source.type || TimedText.inferType(source.name),
 					trackData = TimedText.parse(mime, evt.target.result);
-				if(!track.label){ track.label = TimedText.removeExt(mime, source.name); }
 				load(trackData,mime);
+				if(!track.label){ track.label = TimedText.removeExt(mime, source.name); }
 			};
 			reader.readAsText(source);
-		}else{
-			source = params.url;
+		}else if(typeof source === "string" || source instanceof String){
 			reader = new XMLHttpRequest();
 			reader.open('GET', source, true);
 			reader.onreadystatechange = function(eventData) {
@@ -155,14 +156,22 @@ var TextTrack = (function(){
 				
 				mime = this.getResponseHeader('content-type');
 				trackData = TimedText.parse(mime,this.responseText);
-				if(!track.label){ track.label = TimedText.removeExt(mime, source.substr(source.lastIndexOf('/'))); }
 				load(trackData,mime);
+				if(!track.label){ track.label = TimedText.removeExt(mime, source.substr(source.lastIndexOf('/'))); }
 			};
 			try { reader.send(null); }
 			catch(err) {
 				track.readyState = TextTrack.ERROR;
-				track.onerror(err);
+				setTimeout(track.onerror.bind(track,err),0);
 			}
+		}else if(source instanceof Object){
+			(function(){
+				var fname = source.name,
+					mime = (typeof source.mime === "string" && source.mime) || TimedText.inferType(fname),
+					trackData = TimedText.parse(mime, source.content);
+				load(trackData, mime);
+				if(!track.label){ track.label = TimedText.removeExt(mime, fname); }
+			})();
 		}
 		return track;
 	};
