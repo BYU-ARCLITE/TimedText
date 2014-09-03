@@ -20,18 +20,17 @@
 	Font color - <font color="color name or #code"> ... </font> (as in HTML)
 	*/
 	
-	function processCueText(text, sanitize){
-		var el = document.createElement('div'),
-			dom = document.createDocumentFragment();
-		el.innerHTML = text.replace(/\{(\/?[biu])\}/ig,function(m,l){ return "<"+l+">"; });
-		if(sanitize){ el.innerHTML = el.textContent; }
-		[].slice.call(el.childNodes).forEach(dom.appendChild.bind(dom));
-		return dom;
+	function processCueText(text){
+		var el = document.createElement('div');
+		text = text.replace(/\{(\/?[biu])\}/ig,function(m,l){ return "<"+l+">"; });
+		text = text.replace(/[\r\n]+/g,'<br>');
+		el.innerHTML = text;
+		return formatHTML(el);
 	}
 	
-	SRTCue.prototype.getCueAsHTML = function(sanitize) {
+	SRTCue.prototype.getCueAsHTML = function() {
 		if(!this.DOM){
-			this.DOM = processCueText(this.text,sanitize !== false);
+			this.DOM = processCueText(this.text);
 		}
 		return this.DOM.cloneNode(true);
 	};
@@ -39,13 +38,16 @@
 	//strip out any html that could not have been generated from SRT
 	function formatHTML(node) {
 		var tag, frag;
-		if(node.parentNode === null){ return null; }
 		if(node.nodeType === Node.TEXT_NODE){ return node; }
 		if(node.nodeType === Node.ELEMENT_NODE){
-			tag = node.nodeName.toLowerCase();
-			outer: switch(tag){
-			case "br": case "i": case "u": case "b":
+			tag = node.nodeName;
+			switch(tag){
+			case "BR": case "I": case "U": case "B":
 				frag = document.createElement(tag);
+				break;
+			case "FONT":
+				frag = document.createElement(tag);
+				frag.setAttribute('color', node.getAttribute('color'));
 				break;
 			default:
 				switch(node.childNodes.length){
@@ -54,13 +56,17 @@
 				case 0:
 					return null;
 				default:
-					frag = document.createDocumentFragment();
+					frag = new DocumentFragment();
 				}
 			}
 		}
 		[].slice.call(node.childNodes).forEach(function(cnode){
 			var nnode = formatHTML(cnode);
-			if(nnode){ frag.appendChild(nnode); }
+			if(nnode && ( //drop repeated BRs- blank lines not allowed
+				frag.lastChild === null ||
+				frag.lastChild.nodeName !== 'BR' ||
+				nnode.nodeName !== 'BR' )
+			) { frag.appendChild(nnode); }
 		});
 		return frag;
 	}
@@ -81,7 +87,8 @@
 			default:
 				return HTML2SRT(node);
 			}
-		}).join('');
+		})	.join('') //replace ensures no blank lines are exported
+			.replace(/(\r\n){2,}/g,'\r\n');
 	}
 	
 	function SRTtime(time){

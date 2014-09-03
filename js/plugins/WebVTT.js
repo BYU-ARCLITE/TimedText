@@ -106,7 +106,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	}
 	
 	function processCueText(input) {
-		var DOM = document.createDocumentFragment(),
+		var DOM = new DocumentFragment(),
 			current = DOM,
 			stack = [],
 			lang = "";
@@ -174,12 +174,11 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	//strip out any html that could not have been generated from VTT
 	function formatHTML(node) {
 		var tag, frag;
-		if(node.parentNode === null){ return null; }
 		if(node.nodeType === Node.TEXT_NODE){ return node; }
 		if(node.nodeType === Node.ELEMENT_NODE){
-			tag = node.nodeName.toLowerCase();
+			tag = node.nodeName;
 			outer: switch(tag){
-			case "i":
+			case "I":
 				frag = document.createElement('i');
 				if(node["data-target"] === "timestamp"){
 					frag["data-target"] = "timestamp";
@@ -187,10 +186,10 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 					frag["data-seconds"] = node["data-seconds"];
 				}
 				break;
-			case "br": case "u": case "b": case "ruby": case "rt":
+			case "BR": case "U": case "B": case "RUBY": case "RT":
 				frag = document.createElement(tag);
 				break;
-			case "span":
+			case "SPAN":
 				switch(node['data-cuetag']){
 				case "V": case "C": case "LANG":
 					frag = document.createElement(tag);
@@ -220,22 +219,20 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 			var tag;
 			if(node.nodeType === Node.TEXT_NODE){ return node.nodeValue.replace(/[\r\n]+/g,' '); }
 			if(node.nodeType !== Node.ELEMENT_NODE){ return ""; }
-			tag = node.nodeName.toLowerCase();
+			tag = node.nodeName;
 			switch(tag){
-			case "br": return "\r\n";
-			case "div": return "\r\n"+HTML2VTT(node);
-			case "i":
+			case "BR": return "\r\n";
+			case "DIV": return "\r\n"+HTML2VTT(node);
+			case "I":
 				return (node["data-target"] === "timestamp")
 						?node["data-timestamp"]
 						:("<i>"+HTML2VTT(node)+"</i>");
 			default:
 				return HTML2VTT(node);
-			case "u":
-			case "b":
-			case "ruby":
-			case "rt":
+			case "U": case "B": case "RUBY": case "RT":
+				tag = tag.toLowerCase();
 				return "<"+tag+">"+HTML2VTT(node)+"</"+tag+">";
-			case "span":
+			case "SPAN":
 				switch(node['data-cuetag']){
 				case "V": return "<v "+node['data-voice']+">"+HTML2VTT(node)+"</v>";
 				case "C": return "<c."+node.className.replace(/ /g,'.')+">"+HTML2VTT(node)+"</c>";
