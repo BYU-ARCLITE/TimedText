@@ -106,7 +106,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	}
 	
 	function processCueText(input) {
-		var DOM = new DocumentFragment(),
+        var DOM = document.createDocumentFragment(),
 			current = DOM,
 			stack = [],
 			lang = "";

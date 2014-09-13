@@ -56,7 +56,7 @@
 				case 0:
 					return null;
 				default:
-					frag = new DocumentFragment();
+                    frag = document.createDocumentFragment();
 				}
 			}
 		}
