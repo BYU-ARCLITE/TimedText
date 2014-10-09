@@ -168,7 +168,7 @@ var TextTrack = (function(){
 			(function(){
 				var fname = source.name,
 					mime = (typeof source.mime === "string" && source.mime) || TimedText.inferType(fname),
-					trackData = TimedText.parse(mime, source.content);
+					trackData = TimedText.parse(mime, source.content || source.data);
 				load(trackData, mime);
 				if(!track.label){ track.label = TimedText.removeExt(mime, fname); }
 			})();
