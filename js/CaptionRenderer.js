@@ -1,8 +1,8 @@
 (function(TimedText) {
 	"use strict";
-	
+
 	if(!TimedText){ throw new Error("TimedText not defined."); }
-	
+
 	/* getDisplayMetrics(DOMNode)
 		An object with the following properties:
 			left: The calculated left offset of the display
@@ -14,7 +14,7 @@
 		var UA, offsetObject = renderer.target,
 			nodeComputedStyle = window.getComputedStyle(offsetObject,null),
 			offsetTop = 0, offsetLeft = 0, controlHeight = 0;
-		
+
 		if (typeof renderer.controlHeight === 'number'){
 			controlHeight = renderer.controlHeight;
 		}else if (offsetObject.hasAttribute("controls")) {
@@ -29,13 +29,13 @@
 							~UA.indexOf("safari")?25:
 							0;
 		}
-		
+
 		while(offsetObject && offsetObject !== renderer.appendCueCanvasTo){
 			offsetTop += offsetObject.offsetTop;
 			offsetLeft += offsetObject.offsetLeft;
 			offsetObject = offsetObject.offsetParent;
 		}
-	
+
 		return {
 			left: offsetLeft,
 			top: offsetTop,
@@ -43,16 +43,16 @@
 			height: parseInt(nodeComputedStyle.getPropertyValue("height"),10)-controlHeight
 		};
 	}
-	
+
 	function defaultRenderCue(renderedCue,area){
 		var node, kind = renderedCue.kind;
-		if(renderedCue.dirty){ renderedCue.cleanup(); }			
+		if(renderedCue.dirty){ renderedCue.cleanup(); }
 		if(kind === "chapters" || kind === "metadata"){ return; }
 		node = document.createElement('div');
 		node.appendChild(renderedCue.cue.getCueAsHTML());
 		renderedCue.node = node;
 	}
-	
+
 	/* applyStyles(DOMNode, Style Object)
 		A fast way to apply multiple CSS styles to a DOMNode
 		First parameter: DOMNode to style
@@ -64,7 +64,7 @@
 			style[styleName] = styleObject[styleName];
 		});
 	}
-	
+
 	/* styleCueContainer(renderer)
 		Styles and positions a div for displaying cues on a video.
 	*/
@@ -79,13 +79,13 @@
 				"fontSize": baseFontSize + "pt",
 				"lineHeight": baseLineHeight + "pt"
 			};
-	
+
 		applyStyles(renderer.container,styles);
 		if(renderer.showDescriptions){
 			applyStyles(renderer.descriptor,styles);
 		}
 	}
-	
+
 	function defaultPosCue(rendered, availableCueArea, videoMetrics) {
 		var DOMNode = rendered.node,
 			cueObject = rendered.cue,
@@ -97,16 +97,16 @@
 		basePixelFontSize = Math.floor((baseFontSize/72)*96);
 		baseLineHeight = Math.max(Math.floor(baseFontSize * 1.2), 14);
 		pixelLineHeight = Math.ceil((baseLineHeight/72)*96);
-		
+
 		if (pixelLineHeight * Math.floor(videoMetrics.height / pixelLineHeight) < videoMetrics.height) {
 			pixelLineHeight = Math.floor(videoMetrics.height / Math.floor(videoMetrics.height / pixelLineHeight));
 			baseLineHeight = Math.ceil((pixelLineHeight/96)*72);
 		}
-		
-		
+
+
 		cueWidth = availableCueArea.width;
 		cueX = ((availableCueArea.right - cueWidth)/2) + availableCueArea.left;
-		
+
 		applyStyles(DOMNode,{
 			display: "inline-block",
 			position: "absolute",
@@ -120,13 +120,13 @@
 			direction: TimedText.getTextDirection(DOMNode.textContent),
 			lineHeight: baseLineHeight + "pt",
 			boxSizing: "border-box"
-		});	
-		
+		});
+
 		cueHeight = Math.round(DOMNode.scrollHeight/pixelLineHeight)*pixelLineHeight;
 		cueY = availableCueArea.height + availableCueArea.top - cueHeight;
 		DOMNode.style.height = cueHeight + "px";
 		DOMNode.style.top = cueY + "px";
-		
+
 		// Work out how to shrink the available render area
 		// If subtracting from the bottom works out to a larger area, subtract from the bottom.
 		// Otherwise, subtract from the top.
@@ -139,12 +139,12 @@
 		}
 		availableCueArea.height = availableCueArea.bottom - availableCueArea.top;
 	}
-	
+
 	function defaultContentCheck(rendered){
 		var prop, dirty = false,
 			cue = rendered.cue,
 			properties = rendered.properties;
-		
+
 		for(prop in cue){
 			if(!cue.hasOwnProperty(prop)) { continue; }
 			if(properties[prop] !== cue[prop]){
@@ -152,13 +152,13 @@
 				dirty = true;
 			}
 		}
-		return dirty;	
+		return dirty;
 	}
-	
+
 	function defaultKaraokeCheck(rendered, time){
 		return false;
 	}
-	
+
 	/*	RenderedCue(renderer, cue, track)
 		Auxilliary object for keeping track of a cue that is currently active with a rendered representation.
 		Provides the interface for interacting with custom render functions.
@@ -170,13 +170,13 @@
 			contFn = defaultContentCheck,
 			editable = TimedText.isCueEditable(cue),
 			node = null, gclist = [];
-		
+
 		this.done = false;
 		this.dirty = true;
 		this.time = "";
 		this.properties = {};
 		this.autoPosition = track.kind !== "descriptions" && track.kind !== "metadata";
-		
+
 		Object.defineProperties(this,{
 			cue: { get: function(){ return cue; }, enumerable: true },
 			typeInfo: { get: function(){ return type; }, enumerable: true},
@@ -210,39 +210,39 @@
 				enumerable: true
 			}
 		});
-		
+
 		type = TimedText.getCueTypeInfo(cue);
 		if(type){
 			posFn = type.positionCue || defaultPosCue;
 			timeFn = type.updateCueTime || defaultKaraokeCheck;
 			contFn = type.updateCueContent || defaultContentCheck;
 		}
-		
+
 		this.positionCue = function(availableCueArea, videoMetrics){
 			if(!this.autoPosition || !this.visible){ return; }
 			posFn(this, availableCueArea, videoMetrics);
 		};
-		
+
 		this.updateTime = function(time){
 			if(!(this.node instanceof HTMLElement)){ return false; }
 			return timeFn(this,time);
 		};
-		
+
 		this.updateContent = function(){
 			this.dirty = contFn(this);
 			return this.dirty;
 		};
-		
+
 		this.addFinalizer = function(fn){
 			if(typeof fn !== 'function'){ return; }
 			gclist.push(fn);
 		};
-		
+
 		this.removeFinalizer = function(fn){
 			var idx = gclist.indexOf(fn);
 			if(~idx){ gclist.splice(idx,1); }
 		};
-		
+
 		this.cleanup = function(){
 			var that = this;
 			gclist.forEach(function(fn){ fn.call(that); });
@@ -250,10 +250,10 @@
 				this.node.parentNode.removeChild(this.node);
 			}
 		};
-		
+
 		contFn(this);
 	}
-	
+
 	/* CaptionRenderer([options - JS Object])
 	*/
 	function CaptionRenderer(options) {
@@ -271,24 +271,24 @@
 
 		container.className = "caption-cue-canvas";
 		container.setAttribute("aria-live","off");
-		
+
 		descriptor.id = descriptorId;
-		descriptor.className = "caption-desc-area";	
+		descriptor.className = "caption-desc-area";
 		descriptor.setAttribute("aria-live","assertive");
-		
+
 		appendCueCanvasTo.appendChild(container);
 		appendCueCanvasTo.appendChild(descriptor);
-		
+
 		if(target){
 			target.setAttribute("aria-describedby",target.hasAttribute("aria-describedby") ? target.getAttribute("aria-describedby") + " " + descriptorId : descriptorId);
 			target.classList.add("captioned");
 		}
-		
+
 		this.container = container;
 		this.descriptor = descriptor;
 		this.tracks = [];
 		this.renderedCues = [];
-		
+
 		window.addEventListener("resize", this.refreshLayout.bind(this) ,false);
 		this.bindMediaElement = function(element) {
 			if(media && typeof media.removeEventListener === 'function'){ media.removeEventListener('timeupdate',timeupdate,false); }
@@ -298,7 +298,7 @@
 				this.currentTime = media.currentTime || 0;
 			}
 		};
-		
+
 		Object.defineProperties(this,{
 			target: {
 				get: function(){ return target; },
@@ -372,11 +372,11 @@
 					}
 					return showDescriptions;
 				},
-				enumerable: true				
+				enumerable: true
 			}
 		});
 	}
-	
+
 	CaptionRenderer.prototype.addTextTrack = function(kind,label,language) {
 		var newTrack;
 		if(kind instanceof TextTrack){
@@ -393,9 +393,14 @@
 			newTrack.renderer = this;
 			return newTrack;
 		}
-		return null;			
+		return null;
 	};
-	
+
+	CaptionRenderer.prototype.removeTextTrack = function(track) {
+		var i = this.tracks.indexOf(track);
+		if(i !== -1){ this.tracks.splice(i,1); }
+	};
+
 	function collectCues(tracks, fn){
 		var activeCues = [];
 		tracks.forEach(function(track) {
@@ -404,7 +409,7 @@
 		});
 		return activeCues;
 	}
-	
+
 	CaptionRenderer.prototype.rebuildCaptions = function(force) {
 		var renderer = this,
 			container = this.container,
@@ -414,7 +419,7 @@
 			renderCue = this.renderCue,
 			posBit = false, dirtyBit = force,
 			area, activeCues, videoMetrics;
-			
+
 		if(force){
 			//force re-render no matter what
 			renderedCues.forEach(function(rendered){
@@ -440,29 +445,29 @@
 				dirtyBit = true;
 				return new RenderedCue(renderer,cue,track);
 			});
-			
+
 			renderedCues.forEach(function(old){
 				//check for lapse to inactive status
 				if(activeCues.some(function(rendered){ return rendered.cue === old.cue; })){ return; }
 				posBit = true;
-				
+
 				old.cleanup();
 				if(old.cue.pauseOnExit && this.media && typeof this.media.pause === 'function'){
 					this.media.pause();
 				}
 			});
 		}
-		
+
 		if(!this.target){ return; }
 
 		// If needed, redraw
 		if(dirtyBit){
 			container.style.opacity = 0;
 			descriptor.style.opacity = 0;
-			
+
 			videoMetrics = getDisplayMetrics(this);
 			styleCueContainer(this,videoMetrics);
-			
+
 			// Define storage for the available cue area, diminished as further cues are added
 			// Cues occupy the largest possible area they can, either by width or height
 			// (depending on whether the 'direction' of the cue is vertical or horizontal)
@@ -474,25 +479,25 @@
 				"height": videoMetrics.height,
 				"width": videoMetrics.width
 			};
-			
+
 			activeCues.forEach(function(rendered){
 				var node, kind = rendered.kind;
-				
+
 				if(rendered.dirty){
 					renderCue(rendered,area,
 						function(){ defaultRenderCue(rendered,area); });
 					rendered.done = true;
 					rendered.dirty = false;
 					node = rendered.node;
-						
+
 					if(node === null){ return; }
-						
+
 					if(!node.hasAttribute('lang')){
 						node.setAttribute('lang',rendered.language);
 					}
-					
+
 					rendered.updateTime(currentTime);
-					
+
 					if(rendered.mode === "showing" && node.parentNode === null){
 						if(kind === 'descriptions'){
 							descriptor.appendChild(node);
@@ -501,17 +506,17 @@
 						}
 					}
 				}else if(rendered.node === null){ return; }
-									
+
 				rendered.positionCue(area,videoMetrics);
 			});
 		}else if(posBit){
 			//just reposition things, in case the karaoke styling altered metrics or something disappeared
 			container.style.opacity = 0;
 			descriptor.style.opacity = 0;
-			
+
 			videoMetrics = getDisplayMetrics(this);
 			styleCueContainer(this,videoMetrics);
-			
+
 			area = {
 				"top": 0, "left": 0,
 				"bottom": videoMetrics.height,
@@ -523,14 +528,14 @@
 				rendered.positionCue(area,videoMetrics);
 			});
 		}
-		
+
 		this.renderedCues = activeCues;
 		container.style.opacity = 1;
 		if(this.showDescriptions){
 			descriptor.style.opacity = 1;
 		}
 	};
-	
+
 	CaptionRenderer.prototype.refreshLayout = function() {
 		if(!this.target){ return; }
 		var renderer = this, area,
@@ -550,7 +555,7 @@
 		container.style.opacity = 0;
 		descriptor.style.opacity = 0;
 		styleCueContainer(this,videoMetrics);
-	
+
 		this.renderedCues.forEach(function(rendered) {
 			rendered.updateTime(currentTime);
 			rendered.updateContent();
@@ -561,7 +566,7 @@
 			descriptor.style.opacity = 1;
 		}
 	};
-	
+
 	/* processVideoElement(videoElement <HTMLVideoElement>,
 						[options - JS Object])
 	*/
@@ -572,9 +577,9 @@
 			language = navigator.language || navigator.userLanguage,
 			defaultLanguage = options.language || language.split("-")[0],
 			elements = [].slice.call(videoElement.querySelectorAll("track"),0);
-		
+
 		if(elements.length === 0){ return; }
-		
+
 		elements.forEach(function(trackElement) {
 			var trackEnabled = false,
 				sources = trackElement.querySelectorAll("source"),
@@ -582,12 +587,12 @@
 							trackElement.getAttribute("kind"),
 							trackElement.getAttribute("label"),
 							trackElement.getAttribute("srclang").split("-")[0]);
-			
+
 			trackObject.loadTrack(sources.length > 0?sources:trackElement.getAttribute("src"));
-			
+
 			// Now determine whether the track is visible by default.
 			// The comments in this section come straight from the spec...
-			trackObject.internalDefault = trackElement.hasAttribute("default");			
+			trackObject.internalDefault = trackElement.hasAttribute("default");
 			switch(trackObject.kind){
 				// If the text track kind is subtitles or captions and the user has indicated an interest in having a track
 				// with this text track kind, text track language, and text track label enabled, and there is no other text track
@@ -620,7 +625,7 @@
 					});
 				}
 			}
-		
+
 			// If there is a text track in the media element's list of text tracks whose text track mode is showing by default,
 			// the user agent must furthermore change that text track's text track mode to hidden.
 			trackEnabled && trackList.forEach(function(track) {
@@ -628,23 +633,23 @@
 					trackObject.mode = "hidden";
 				}
 			});
-		
+
 			// If the track element has a default attribute specified, and there is no other text track in the media element's
 			// list of text tracks whose text track mode is showing or showing by default
 			// Let the text track mode be showing by default.
 			trackEnabled |= trackObject.internalDefault && !trackList.some(function(track) {
 				return track.mode === "showing";
 			});
-	
+
 			// Otherwise
 			// Let the text track mode be disabled.
 			trackObject.mode = trackEnabled?"showing":"disabled";
 			trackObject.renderer = renderer;
 			trackList.push(trackObject);
 		});
-		
+
 		this.rebuildCaptions(false);
 	};
-	
+
 	TimedText.CaptionRenderer = CaptionRenderer;
 }(window.TimedText));
