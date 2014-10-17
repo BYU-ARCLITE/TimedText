@@ -1,48 +1,89 @@
 (function(TimedText){
 	"use strict";
-	
+
 	if(!TimedText){ throw new Error("TimedText not defined."); }
-	
+
 	var time_pat = /\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*-->\s*(\d*:?[0-5]\d:[0-5]\d[,.]\d{3})\s*(.*)/;
 	var set_pat = /X1:(\d+)\s+X2:(\d+)\s+Y1:(\d+)\s+Y2:(\d+)\s*/;
-	
+
 	var SRTCue = TimedText.makeCueType(function(){
 		this.x1 = null;
 		this.x2 = null;
 		this.y1 = null;
 		this.y2 = null;
 	});
-	
+
 	/*
 	Bold - <b> ... </b> or {b} ... {/b}
 	Italic - <i> ... </i> or {i} ... {/i}
 	Underline - <u> ... </u> or {u} ... {/u}
 	Font color - <font color="color name or #code"> ... </font> (as in HTML)
 	*/
-	
-	function processCueText(text){
-		var el = document.createElement('div');
-		text = text.replace(/\{(\/?[biu])\}/ig,function(m,l){ return "<"+l+">"; });
-		text = text.replace(/[\r\n]+/g,'<br>');
-		el.innerHTML = text;
-		return formatHTML(el);
+
+	function processCueText(input){
+        var DOM = document.createDocumentFragment(),
+			current = DOM,
+			stack = [];
+
+		input
+			.split(/(<\/?[^>]+>|\{\/?[biu]\})/ig)
+			.filter(function(cuePortionText){
+				return !!cuePortionText.replace(/\s*/ig,"");
+			}).forEach(function(token){
+			var tag, ttype, chunk, node, frags;
+			ttype = token[0];
+			if(ttype !== "<" && ttype !=="{"){ // Text string
+				frags = token.replace(/\n\r/g,'\n').split(/\n(?!$)/g);
+				frags.forEach(function(frag){
+					current.appendChild(document.createTextNode(frag));
+					current.appendChild(document.createElement('br'));
+				});
+				current.removeChild(current.lastChild);
+			}else if(token[1] === "/" && ttype === stack[stack.length-1]){ //Closing tag
+				tag = token.match(/<\/([^\s>]+)/)[1].toUpperCase();
+				if(tag === current.nodeName){
+					current = current.parentNode;
+					//remove empty nodes
+					if(current.lastChild.childNodes.length === 0){
+						current.removeChild(current.lastChild);
+					}
+					stack.pop();
+				}
+				// else tag mismatch; ignore.
+			}else{ //Opening tag
+				if(chunk = token.match(/[<{]font\s+color="([^"]+)"\s*[>}]/i)){
+					node = document.createElement('span');
+					node.style.color = chunk[1];
+					stack.push(ttype);
+				}else if(chunk = token.match(/[<{](b|i|u)[>}]/)){
+					node = document.createElement(chunk[1]);
+					stack.push(ttype);
+				}else{
+					return;
+				}
+				current.appendChild(node);
+				current = node;
+			}
+		});
+		return DOM;
 	}
-	
-	SRTCue.prototype.getCueAsHTML = function() {
+
+	SRTCue.prototype.getCueAsHTML = function(){
 		if(!this.DOM){
 			this.DOM = processCueText(this.text);
 		}
 		return this.DOM.cloneNode(true);
 	};
-	
+
 	//strip out any html that could not have been generated from SRT
-	function formatHTML(node) {
+	function formatHTML(node){
 		var tag, frag;
 		if(node.nodeType === Node.TEXT_NODE){ return node; }
 		if(node.nodeType === Node.ELEMENT_NODE){
 			tag = node.nodeName;
 			switch(tag){
-			case "BR": case "I": case "U": case "B":
+			case "BR": return node.cloneNode(false);
+			case "I": case "U": case "B":
 				frag = document.createElement(tag);
 				break;
 			case "FONT":
@@ -50,14 +91,11 @@
 				frag.setAttribute('color', node.getAttribute('color'));
 				break;
 			default:
-				switch(node.childNodes.length){
-				case 1:
+				//this is where invalid tags are dropped
+				if(node.childNodes.length === 1){
 					return formatHTML(node.firstChild);
-				case 0:
-					return null;
-				default:
-                    frag = document.createDocumentFragment();
 				}
+				frag = document.createDocumentFragment();
 			}
 		}
 		[].slice.call(node.childNodes).forEach(function(cnode){
@@ -66,23 +104,21 @@
 				frag.lastChild === null ||
 				frag.lastChild.nodeName !== 'BR' ||
 				nnode.nodeName !== 'BR' )
-			) { frag.appendChild(nnode); }
+			){ frag.appendChild(nnode); }
 		});
 		return frag;
 	}
-	
-	function HTML2SRT(parent) {
+
+	function HTML2SRT(parent){
 		return [].map.call(parent.childNodes,function(node){
 			var tag;
 			if(node.nodeType === Node.TEXT_NODE){ return node.nodeValue.replace(/[\r\n]+/g,' '); }
 			if(node.nodeType !== Node.ELEMENT_NODE){ return ""; }
-			tag = node.nodeName.toLowerCase();
+			tag = node.nodeName;
 			switch(tag){
-			case "br": return "\r\n";
-			case "div": return "\r\n"+HTML2SRT(node);
-			case "i":
-			case "u":
-			case "b":
+			case "BR": return "\r\n";
+			case "DIV": return "\r\n"+HTML2SRT(node);
+			case "I": case "U": case "B":
 				return "<"+tag+">"+HTML2SRT(node)+"</"+tag+">";
 			default:
 				return HTML2SRT(node);
@@ -90,7 +126,7 @@
 		})	.join('') //replace ensures no blank lines are exported
 			.replace(/(\r\n){2,}/g,'\r\n');
 	}
-	
+
 	function SRTtime(time){
 		var seconds = Math.floor(time),
 			minutes = Math.floor(seconds/60),
@@ -104,7 +140,7 @@
 				+(ss>9?ss:"0"+ss)+","
 				+(ms>99?ms:(ms>9?"0"+ms:"00"+ms));
 	}
-	
+
 	function serialize(cue,index){
 		return (parseInt(cue.id,10)||(index+1))+"\n"
 			+ SRTtime(cue.startTime)+" --> "+SRTtime(cue.endTime)
@@ -125,7 +161,7 @@
 		}
 		return ret + parseInt(fields[p],10)*60 + parseInt(fields[++p],10);
 	}
-	
+
 	function parse_settings(cue,line){
 		var fields = set_pat.exec(line);
 		if(!fields){ return; }
@@ -134,7 +170,7 @@
 		cue.y1 = parseInt(fields[3],10);
 		cue.y2 = parseInt(fields[4],10);
 	}
-	
+
 	function add_cue(p,input,id,fields,cue_list){
 		var s, l, cue, len=input.length;
 		get_text: {
@@ -150,7 +186,7 @@
 				if(	(input[p] === '\r') && //Skip CR
 					(++p >= len)	){break;}
 				if(input[p] === '\n'){ ++p; } //Skip LF
-			}while(p < len); 
+			}while(p < len);
 		}
 		cue = new SRTCue(
 				parse_timestamp(fields[1]), //startTime
@@ -163,7 +199,7 @@
 		cue_list.push(cue);
 		return p;
 	}
-	
+
 	function parse(input){
 		var line,fields,l,p,id=0,
 			cue_list = [],
@@ -171,21 +207,21 @@
 
 		//If the first character is a BYTE ORDER MARK, skip it.
 		p = +(input[0] === '\uFEFF');
-		
+
 		function crlf(){
 			if(	(input[p] === '\r') && //Skip CR
 				(++p >= len)	){throw 0;}
 			if(	(input[p] === '\n')	&& //Skip LF
 				(++p >= len)	){throw 0;}
 		}
-		
+
 		function collect_line(){
 			l=p; //Collect a sequence of characters that are not CR or LF characters.
 			while(input[p]!=='\r' && input[p] !=='\n'){
 				if(++p >= len){throw 0;}
 			}
 		}
-		
+
 		try {
 			cue_loop: do{
 				/**Skip the number line**/
@@ -204,7 +240,7 @@
 				if(line.indexOf('-->')===-1){
 					continue cue_loop;
 				}
-				
+
 				//Collect SRT cue timings
 				if(fields = time_pat.exec(line)){
 					p = add_cue(p,input,String(++id),fields,cue_list);
@@ -225,27 +261,27 @@
 			};
 		}
 	}
-	
+
 	/* applyStyles(DOMNode, Style Object)
 		A fast way to apply multiple CSS styles to a DOMNode
 		First parameter: DOMNode to style
 		Second parameter: An object where the keys are camel-cased CSS property names
 	*/
-	function applyStyles(Node, styleObject) {
+	function applyStyles(Node, styleObject){
 		var style = Node.style;
 		Object.keys(styleObject).forEach(function(styleName){
 			style[styleName] = styleObject[styleName];
 		});
 	}
-	
-	function positionCue(rendered, availableCueArea, videoMetrics) {
+
+	function positionCue(rendered, availableCueArea, videoMetrics){
 		var DOMNode = rendered.node,
 			cueObject = rendered.cue,
 			cueX = 0, cueY = 0, cueWidth = 0, cueHeight = 0,
 			baseFontSize, basePixelFontSize, baseLineHeight, pixelLineHeight;
 
 		baseFontSize = Math.max(((videoMetrics.height * 0.045)/96)*72, 10);
-		
+
 		if(typeof cueObject.x1 === 'number'){
 			applyStyles(DOMNode,{
 				position: "absolute",
@@ -270,15 +306,15 @@
 			basePixelFontSize = Math.floor((baseFontSize/72)*96);
 			baseLineHeight = Math.max(Math.floor(baseFontSize * 1.2), 14);
 			pixelLineHeight = Math.ceil((baseLineHeight/72)*96);
-			
-			if (pixelLineHeight * Math.floor(videoMetrics.height / pixelLineHeight) < videoMetrics.height) {
+
+			if(pixelLineHeight * Math.floor(videoMetrics.height / pixelLineHeight) < videoMetrics.height){
 				pixelLineHeight = Math.floor(videoMetrics.height / Math.floor(videoMetrics.height / pixelLineHeight));
 				baseLineHeight = Math.ceil((pixelLineHeight/96)*72);
 			}
-			
+
 			cueWidth = availableCueArea.width;
 			cueX = ((availableCueArea.right - cueWidth)/2) + availableCueArea.left;
-			
+
 			applyStyles(DOMNode,{
 				display: "inline-block",
 				position: "absolute",
@@ -292,27 +328,27 @@
 				direction: TimedText.getTextDirection(DOMNode.textContent),
 				lineHeight: baseLineHeight + "pt",
 				boxSizing: "border-box"
-			});	
-			
+			});
+
 			cueHeight = Math.round(DOMNode.scrollHeight/pixelLineHeight)*pixelLineHeight;
 			cueY = availableCueArea.height + availableCueArea.top - cueHeight;
 			DOMNode.style.height = cueHeight + "px";
 			DOMNode.style.top = cueY + "px";
-			
+
 			// Work out how to shrink the available render area
 			// If subtracting from the bottom works out to a larger area, subtract from the bottom.
 			// Otherwise, subtract from the top.
-			if ((cueY - 2*availableCueArea.top) >=
+			if((cueY - 2*availableCueArea.top) >=
 				(availableCueArea.bottom - (cueY + cueHeight)) &&
-				availableCueArea.bottom > cueY) {
+				availableCueArea.bottom > cueY){
 				availableCueArea.bottom = cueY;
-			} else if (availableCueArea.top < cueY + cueHeight) {
+			}else if(availableCueArea.top < cueY + cueHeight){
 				availableCueArea.top = cueY + cueHeight;
 			}
 			availableCueArea.height = availableCueArea.bottom - availableCueArea.top;
 		}
 	}
-	
+
 	TimedText.registerType('text/srt', {
 		extension: 'srt',
 		name: 'SubRip',
@@ -321,6 +357,9 @@
 		formatHTML: formatHTML,
 		textFromHTML: HTML2SRT,
 		positionCue: positionCue,
+		updateCueTime: null,
+		updateCueContent: null,
+		attachEditor: null,
 		parse: parse,
 		serialize: function(track){
 			return [].map.call(track.cues,function(cue,index){ return serialize(cue,index); }).join('');
