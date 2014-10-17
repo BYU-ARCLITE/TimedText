@@ -50,14 +50,11 @@
 				frag.setAttribute('color', node.getAttribute('color'));
 				break;
 			default:
-				switch(node.childNodes.length){
-				case 1:
+				//this is where invalid tags are dropped
+				if(node.childNodes.length === 1){
 					return formatHTML(node.firstChild);
-				case 0:
-					return null;
-				default:
-                    frag = document.createDocumentFragment();
 				}
+				frag = document.createDocumentFragment();
 			}
 		}
 		[].slice.call(node.childNodes).forEach(function(cnode){
