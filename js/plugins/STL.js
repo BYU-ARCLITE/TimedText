@@ -255,6 +255,10 @@
 			tag = node.nodeName;
 			switch(tag){
 			case "BR": return node.cloneNode(false);
+			case "DIV":
+				frag = document.createDocumentFragment();
+				frag.appendChild(document.createElement('br'));
+				break;
 			case "U": case "B": case "I":
 				frag = document.createElement(tag);
 				break;

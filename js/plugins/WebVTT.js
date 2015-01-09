@@ -179,6 +179,10 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 			tag = node.nodeName;
 			outer: switch(tag){
 			case "BR": return node.cloneNode(false);
+			case "DIV":
+				frag = document.createDocumentFragment();
+				frag.appendChild(document.createElement('br'));
+				break;
 			case "I":
 				frag = document.createElement('i');
 				if(node["data-target"] === "timestamp"){
