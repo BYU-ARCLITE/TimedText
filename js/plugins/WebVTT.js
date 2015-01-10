@@ -1,7 +1,7 @@
 /*
 http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 */
-(function(){
+(function(TimedText){
 	"use strict";
 
 	if(!TimedText){ throw new Error("TimedText not defined."); }
@@ -271,7 +271,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		return text+(mm>9?mm:"0"+mm)+":"+(ss>9?ss:"0"+ss)+"."+(ms>99?ms:(ms>9?"0"+ms:"00"+ms));
 	}
 
-	function serialize(cue){
+	function serializeCue(cue){
 		var text = (cue.id?cue.id+"\r\n":"")
 			+VTTtime(cue.startTime)+" --> "+VTTtime(cue.endTime);
 		if(cue.vertical !== ''){ text+=" vertical:"+cue.vertical; }
@@ -280,6 +280,10 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		if(cue.size !== 100){ text+=" line:"+cue.size+"%"; }
 		if(cue.position !== 50){ text+=" position:"+cue.position+"%"; }
 		return text+"\r\n"+cue.text.replace(/(\r?\n)+$/g,"")+"\r\n\r\n";
+	}
+
+	function serialize(track){
+		return "WEBVTT\r\n\r\n"+[].map.call(track.cues,function(cue){ return serializeCue(cue); }).join('');
 	}
 
 	function parse_timestamp(input){
@@ -745,8 +749,6 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		updateCueContent: null,
 		attachEditor: attachEditor,
 		parse: parse,
-		serialize: function(track){
-			return "WEBVTT\r\n\r\n"+[].map.call(track.cues,function(cue){ return serialize(cue); }).join('');
-		}
+		serialize: serialize
 	});
-}());
+}(window.TimedText));

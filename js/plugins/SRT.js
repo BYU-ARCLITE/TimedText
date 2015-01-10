@@ -145,11 +145,17 @@
 				+(ms>99?ms:(ms>9?"0"+ms:"00"+ms));
 	}
 
-	function serialize(cue,index){
+	function serializeCue(cue,index){
 		return (parseInt(cue.id,10)||(index+1))+"\n"
 			+ SRTtime(cue.startTime)+" --> "+SRTtime(cue.endTime)
 			+ (typeof cue.x1 === 'number'?(" X1:"+cue.x1+" X2:"+cue.x2+" Y1:"+cue.y1+" Y2:"+cue.y2+"\n"):"\n")
 			+ cue.text.replace(/(\r?\n)+$/g,"")+"\n\n";
+	}
+
+	function serialize(track){
+		return [].map.call(track.cues,function(cue,index){
+			return serializeCue(cue,index);
+		}).join('');
 	}
 
 	function parse_timestamp(input){
@@ -365,8 +371,6 @@
 		updateCueContent: null,
 		attachEditor: null,
 		parse: parse,
-		serialize: function(track){
-			return [].map.call(track.cues,function(cue,index){ return serialize(cue,index); }).join('');
-		}
+		serialize: serialize
 	});
 }(window.TimedText));
