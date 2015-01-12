@@ -84,16 +84,15 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	//http://dev.w3.org/html5/webvtt/#webvtt-cue-text-dom-construction-rules
 	function createTimestampNode(timeData){
 		var node,
-			hh = parseInt(timeData[1],10)|| 0,
-			mm = parseInt(timeData[2],10) || 0,
-			ss = parseInt(timeData[3],10) || 0,
-			ms = parseFloat("0."+timeData[4]);
+			hh = parseInt(timeData[1],10)||0,
+			mm = parseInt(timeData[2],10)||0,
+			ss = parseInt(timeData[3],10)||0,
+			ms = parseInt(timeData[4],10)||0;
 
 		node = document.createElement('i');
 		node.dataset.target = "timestamp";
-		node.dataset.seconds = hh*3600+mm*60+ss+ms;
+		node.dataset.seconds = hh*3600+mm*60+ss+ms/1000;
 
-		ms *= 1000;
 		node.dataset.timestamp = (hh>9?hh:"0"+hh)+":" +
 					(mm>9?mm:"0"+mm)+":" +
 					(ss>9?ss:"0"+ss)+"." +
@@ -184,12 +183,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 				frag.appendChild(document.createElement('br'));
 				break;
 			case "I":
-				frag = document.createElement('i');
-				if(node["data-target"] === "timestamp"){
-					frag["data-target"] = "timestamp";
-					frag["data-timestamp"] = node["data-timestamp"];
-					frag["data-seconds"] = node["data-seconds"];
-				}
+				frag = node.cloneNode(false);
 				break;
 			case "U": case "B": case "RUBY": case "RT":
 				frag = document.createElement(tag);
@@ -211,10 +205,10 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		}
 		[].slice.call(node.childNodes).forEach(function(cnode){
 			var nnode = formatHTML(cnode);
-			if(nnode && ( //drop repeated BRs- blank lines not allowed
+			if( //drop repeated BRs- blank lines not allowed
 				frag.lastChild === null ||
 				frag.lastChild.nodeName !== 'BR' ||
-				nnode.nodeName !== 'BR' )
+				nnode.nodeName !== 'BR'
 			){ frag.appendChild(nnode); }
 		});
 		return frag;
