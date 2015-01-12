@@ -167,7 +167,8 @@
 
 	STLCue.prototype.getCueAsHTML = function(){
 		if(!this.DOM){
-			this.DOM = processCueText(this.text);
+			this.DOM = document.createElement('span');
+			this.DOM.appendChild(STL2HTML(this.text));
 			this.DOM.style.opacity = ""+(1 - cue.TextContrast/15);
 			this.DOM.style.background = "rgba(0,0,0,"+(1 - cue.BackgroundContrast/15)+")";
 			if(cue.FontName !== ""){
@@ -316,9 +317,7 @@
 			[].map.call(parent.childNodes,function(node){
 				var tag;
 				if(node.nodeType === Node.TEXT_NODE){
-					return node.nodeValue
-							.replace(/[\r\n]+/g,' ')
-							.replace(/\^[BIU]/g,'');
+					return node.nodeValue.replace(/[\r\n]+/g,' ');
 				}else if(node.nodeType !== Node.ELEMENT_NODE){ return ""; }
 				tag = node.nodeName;
 				switch(tag){
@@ -334,7 +333,7 @@
 
 	//Turn STL text into the corresponding HTML
 	function STL2HTML(text){
-        var DOM = document.createElement('span'),
+        var DOM = document.createDocumentFragment(),
 			current = DOM,
 			stack = [];
 
@@ -462,7 +461,7 @@
 
 	function parse(input){
 		var match,line,
-			fields,cue,id=0,
+			fields,id=0,
 			settings = {},
 			cueList = [],
 			len = input.length;
@@ -493,7 +492,7 @@
 		};
 	}
 
-	TimedText.registerType('text/stl', {
+	TimedText.registerType('text/subtitle+stl', {
 		extension: 'stl',
 		name: 'Spruce Subtitle',
 		cueType: STLCue,
