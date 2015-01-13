@@ -3,7 +3,7 @@
 
 	if(!TimedText){ throw new Error("TimedText not defined."); }
 
-	var cuePat = /\[(\d\d+):([0-5]\d).(\d\d)\]\s*(.*?)\s*/;
+	var cuePat = /\[(\d\d+):([0-5]\d).(\d\d)\]\s*(.*?)\s*$/;
 	var timePat = /<(\d\d+):([0-5]\d).(\d\d)>/;
 	var titlePat = /\[ti:\s*(.*?)\s*\]/;
 	var offsetPat = /\[offset:\s*(\d*)\s*\]/;
@@ -46,7 +46,7 @@
 
 	//Turn HTML into the closest corresponding LRC text
 	function HTML2LRC(parent){
-		[].map.call(parent.childNodes,function(node){
+		return [].map.call(parent.childNodes,function(node){
 			if(node.nodeType === Node.TEXT_NODE){
 				return node.nodeValue.replace(/[\r\n]+/g,' ');
 			}
@@ -82,11 +82,10 @@
 			.split(/(<\d\d+:[0-5]\d.\d\d>)/g)
 			.forEach(function(token){
 				var match = timePat.exec(token);
-				if(match){ // Karaoke tag
-					DOM.appendChild(createTimestampNode(match));
-				}else{
-					DOM.appendChild(document.createTextNode(token));
-				}
+				DOM.appendChild(match
+					?createTimestampNode(match) // Karaoke tag
+					:document.createTextNode(token)
+				);
 			});
 		return DOM;
 	}
@@ -105,14 +104,14 @@
 	}
 
 	function serializeCue(cue){
-		return LRCtime(cue.startTime)+cue.text;
+		return LRCtime(cue.startTime)+' '+cue.text;
 	}
 
 	function serialize(track){
 		//TODO: serialize track title information
 		var end = track.cues.reduce(function(acc,c){
 			return Math.max(acc,c.endTime);
-		});
+		},0);
 		return '[length: '
 			+Math.round(end/60).toString(10)+':'
 			+Math.round(end%60).toString(10)+']\n'
@@ -122,7 +121,7 @@
 	/**Parser Functions**/
 
 	function parse(input){
-		var match, line,
+		var match, line, len,
 			time, title = "",
 			offset = 0, length = 0,
 			cuedata = [], cueList = [];
@@ -150,9 +149,10 @@
 		}
 
 		//Second pass: fill in end times
+		len = cuedata.length-1;
 		cuedata.sort(function(a,b){ return a.start<b.start?-1:1; });
 		cueList = cuedata.map(function(data,i){
-			var cue, end = (i >= cuedata.length)?
+			var cue, end = (i === len)?
 						((length > data.start)?length:(data.start+60)):
 						cuedata[i+1].start;
 			cue = new LRCCue(data.start, end, data.text);
@@ -180,6 +180,7 @@
 		updateCueContent: null,
 		attachEditor: null,
 		parse: parse,
-		serialize: serialize
+		serialize: serialize,
+		packed: true
 	});
 }(window.TimedText));
