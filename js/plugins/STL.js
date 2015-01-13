@@ -401,7 +401,21 @@
 	}
 
 	function serialize(track){
-		var settings = {};
+		var settings = {
+			FontName: "",
+			FontSize: 0,
+			Bold: false,
+			Italic: false,
+			Underlined: false,
+			TextContrast: 15,
+			BackgroundContrast: 0,
+			HorzAlign: "center",
+			VertAlign: "bottom",
+			XOffset: 0,
+			YOffset: 0,
+			FadeIn: 0,
+			FadeOut: 0
+		};
 		return [].map.call(track.cues,function(cue){ return serializeCue(cue,settings); }).join('');
 	}
 
