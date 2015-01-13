@@ -1,11 +1,9 @@
 (function(global, TimedText){
 	"use strict";
-	
+
 	if(!TimedText){ throw new Error("TimedText not defined."); }
-	//if(!global.TextTrackCue){
-		global.TextTrackCue = function(){};
-	//}
-	
+	global.TextTrackCue = function(){};
+
 	function makeCue(start, end, text) {
 		var wasActive = false,
 			that = this,
@@ -13,14 +11,15 @@
 				enter: [function(evt){ if(typeof that.onenter === 'function'){ that.onenter(evt); } }],
 				exit: [function(evt){ if(typeof that.onexit === 'function'){ that.onexit(evt); } }]
 			};
-			
+
 		start = parseFloat(start);
 		end = parseFloat(end);
-		
+
 		this.track = null;
 		this.id = "";
 		this.pauseOnExit = false;
-		
+
+		text = this.sanitizeText(text);
 		Object.defineProperties(this,{
 			DOM: { value: null, writable: true },
 			addEventListener: {
@@ -49,7 +48,7 @@
 			text: {
 				set: function(t){
 					this.DOM = null;
-					text = t;
+					text = this.sanitizeText(t);
 					return text;
 				},
 				get: function(){ return text; },
@@ -73,7 +72,7 @@
 							track.readyState !== TextTrack.LOADED ||
 							track.mode === "disabled"
 						){ return false; }
-					
+
 					currentTime = track.currentTime;
 					if (this.startTime <= currentTime && this.endTime >= currentTime) {
 						if (!wasActive) {
@@ -92,13 +91,14 @@
 			}
 		});
 	};
-	
+
 	TimedText.makeCueType = function(cons){
 		var Cue = function(start, end, text){
 			makeCue.call(this, start, end, text);
 			cons.call(this);
 		};
-		Cue.prototype = new TextTrackCue(0,0,'');
+		Cue.prototype = new TextTrackCue();
+		Cue.prototype.sanitizeText = function(t){ return t; };
 		return Cue;
 	};
 }(window,window.TimedText));

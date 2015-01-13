@@ -16,6 +16,10 @@
 		return this.DOM.cloneNode(true);
 	};
 
+	SUBCue.prototype.sanitizeText = function(t){
+		return t.replace(/\r?\n/g,'[br]');
+	};
+
 	/**HTML Manipulation Functions**/
 
 	//strip out any html that could not have been generated from SUB
@@ -43,10 +47,10 @@
 
 		[].slice.call(node.childNodes).forEach(function(cnode){
 			var nnode = formatHTML(cnode);
-			if(nnode && ( //drop repeated BRs- blank lines not allowed
+			if( //drop repeated BRs- blank lines not allowed
 				frag.lastChild === null ||
 				frag.lastChild.nodeName !== 'BR' ||
-				nnode.nodeName !== 'BR' )
+				nnode.nodeName !== 'BR'
 			){ frag.appendChild(nnode); }
 		});
 		return frag;
@@ -96,7 +100,7 @@
 	function serializeCue(cue){
 		return 	SUBtime(cue.startTime)+','+
 				SUBtime(cue.endTime)+'\n'+
-				cue.text.replace(/(\r?\n)+$/g,"")+"\n\n";
+				cue.text+"\n\n";
 	}
 
 	function serialize(track){

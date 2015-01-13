@@ -84,11 +84,15 @@
 		return dom;
 	}
 
-	ASSCue.prototype.getCueAsHTML = function() {
+	ASSCue.prototype.getCueAsHTML = function(){
 		if(!this.DOM){
 			this.DOM = processCueText(this.text, this.wrapStyle);
 		}
 		return this.DOM.cloneNode(true);
+	};
+	
+	ASSCue.prototype.sanitizeText = function(t){
+		return t.replace(/\r?\n/g,'\\N');
 	};
 
 	/**Editor Interaction Functions **/

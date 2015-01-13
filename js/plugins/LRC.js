@@ -19,6 +19,10 @@
 		return this.DOM.cloneNode(true);
 	};
 
+	LRCCue.prototype.sanitizeText = function(t){
+		return t.replace(/[\r\n]+/g,' ');
+	};
+
 	/**HTML Manipulation Functions**/
 
 	//strip out any html aside from karaoke tags
@@ -86,7 +90,7 @@
 			});
 		return DOM;
 	}
-	
+
 	/**Serialization Functions**/
 
 	function LRCtime(time){
@@ -144,7 +148,7 @@
 			}
 			match = linePat.exec(input);
 		}
-		
+
 		//Second pass: fill in end times
 		cuedata.sort(function(a,b){ return a.start<b.start?-1:1; });
 		cueList = cuedata.map(function(data,i){
@@ -155,7 +159,7 @@
 			cue.id = (i+1).toString(10);
 			return cue;
 		});
-		
+
 		return {
 			cueList: cueList,
 			kind: 'subtitles',
