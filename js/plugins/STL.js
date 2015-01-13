@@ -7,7 +7,7 @@
 	var timePat = /(\d\d+):([0-5]\d):([0-5]\d):(\d\d)/;
 	var cuePat = /(\S+)\s*,\s*(\S+)\s*,\s?\t*(.*)/;
 	var setPat = /\$(\S+)\s*=\s*(\S+)/;
-	var linePat = /^(\s*\S.+?)\s*$/gm;
+	var linePat = /^\s*(\S.+?)\s*$/gm;
 	var commandParsers = {
 		/**Cue Text Controls**/
 		FontName: parseStr,

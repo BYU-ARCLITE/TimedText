@@ -104,8 +104,9 @@
 	}
 
 	function serialize(track){
-		//INFORMATION section is optional, se we leave it out.
-		return "[SUBTITLE]\n"+[].map.call(track.cues,serializeCue).join('');
+		return "[INFORMATION]\n[TITLE] "+TimedText.removeExt('text/subtitle+sub',track.label)
+			+"\n[END INFORMATION]\n[SUBTITLE]\n"
+			+[].map.call(track.cues,serializeCue).join('');
 	}
 
 	/**Parser Functions**/

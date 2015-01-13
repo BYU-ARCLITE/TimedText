@@ -8,7 +8,7 @@
 	var titlePat = /\[ti:\s*(.*?)\s*\]/;
 	var offsetPat = /\[offset:\s*(\d*)\s*\]/;
 	var lengthPat = /\[length:\s*(\d+):([0-5]\d[\d.]*)\]/;
-	var linePat = /^(\s*\S.+?)\s*$/gm;
+	var linePat = /^\s*(\S.+?)\s*$/gm;
 
 	var LRCCue = TimedText.makeCueType(function(){});
 
@@ -108,11 +108,11 @@
 	}
 
 	function serialize(track){
-		//TODO: serialize track title information
 		var end = track.cues.reduce(function(acc,c){
 			return Math.max(acc,c.endTime);
 		},0);
-		return '[length: '
+		return '[ti: '+TimedText.removeExt('text/subtitle+lrc',track.label.replace(']',''))
+			+']\n[length: '
 			+Math.round(end/60).toString(10)+':'
 			+Math.round(end%60).toString(10)+']\n'
 			+[].map.call(track.cues,serializeCue).join('\n');

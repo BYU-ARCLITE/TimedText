@@ -259,12 +259,13 @@
 
 	//Top-level function whihc serializes a text track
 	//into a SubStation Alpha-format text file
-	function serialize(data){
-		if(!(data instanceof Array)){ data = data.cues; }
-		return "[Script Info]\nTitle:<untitled>\nOriginal Script:<unknown>\nScriptType: v4.00+\nCollisions: Normal\nPlayResY: 1080\nPlayResX: 1920\nPlayDepth: 0\nTimer: 100.0000\nWrapStyle: 0\n\n"
-		+serializeStyles(data)+'\n'
-		+serializeEvents(data)+'\n'
-		+serializeGraphics(data);
+	function serialize(track){
+		var cues = track.cues;
+		return "[Script Info]\nTitle: "+TimedText.removeExt('text/x-ssa',track.label)
+		+"\nOriginal Script:<unknown>\nScriptType: v4.00+\nCollisions: Normal\nPlayResY: 1080\nPlayResX: 1920\nPlayDepth: 0\nTimer: 100.0000\nWrapStyle: 0\n\n"
+		+serializeStyles(cues)+'\n'
+		+serializeEvents(cues)+'\n'
+		+serializeGraphics(cues);
 	}
 
 	/**Parsing Functions**/
