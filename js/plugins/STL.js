@@ -169,16 +169,20 @@
 		if(!this.DOM){
 			this.DOM = document.createElement('span');
 			this.DOM.appendChild(STL2HTML(this.text));
-			this.DOM.style.opacity = ""+(1 - cue.TextContrast/15);
-			this.DOM.style.background = "rgba(0,0,0,"+(1 - cue.BackgroundContrast/15)+")";
-			if(cue.FontName !== ""){
-				this.DOM.style.fontFamily = cue.FontName;
+			this.DOM.style.opacity = ""+(this.TextContrast/15);
+			this.DOM.style.background = "rgba(0,0,0,"+(this.BackgroundContrast/15)+")";
+			if(this.FontName !== ""){
+				this.DOM.style.fontFamily = this.FontName;
 			}
-			if(cue.FontSize !== 0){
-				this.DOM.style.fontSize = cue.FontSize.toString(10)+"pt";
+			if(this.FontSize !== 0){
+				this.DOM.style.fontSize = this.FontSize.toString(10)+"pt";
 			}
 		}
 		return this.DOM.cloneNode(true);
+	};
+
+	STLCue.prototype.sanitizeText = function(t){
+		return t.replace(/\r?\n/g,'|');
 	};
 
 	/**Text Manipulation Functions**/
@@ -204,11 +208,9 @@
 			}
 			c = text[++i];
 			switch(c){
-			case 'B':
-			case 'I':
-			case 'U':
+			case 'B': case 'I': case 'U':
 				if(p < i-1){ output.push(text.substring(p,i-1)); }
-				p = ++i
+				p = ++i;
 				code = '^'+c;
 				if(stack[stack.length-1] === code){
 					output_code(code);
@@ -240,7 +242,7 @@
 			text = text.replace(/\^U((\^[BI])*)\^U/,"$1");
 			nlen = text.length;
 		}while(nlen < len);
-		return text.replace(/(\^[BIU])+$/,"")
+		return text.replace(/(\^[BIU])+$/,"");
 	}
 
 	/**HTML Manipulation Functions**/
@@ -252,28 +254,30 @@
 			return /\^[BIU]/.test(node.textValue)?
 				document.createTextNode(node.textValue.replace(/\^[BIU]|\|/g,"")):
 				node.cloneNode(false);
-		}else if(node.nodeType === Node.ELEMENT_NODE){
-			tag = node.nodeName;
-			switch(tag){
-			case "BR": return node.cloneNode(false);
-			case "DIV":
-				frag = document.createDocumentFragment();
-				frag.appendChild(document.createElement('br'));
-				break;
-			case "U": case "B": case "I":
-				frag = document.createElement(tag);
-				break;
-			case "SPAN":
-				frag = document.createElement("span");
-				frag.style.fontFamily = node.style.fontFamily;
-				frag.style.fontSize = node.style.fontSize;
-				break;
-			default:
-				if(node.childNodes.length === 1){
-					return formatHTML(node.firstChild);
-				}
-				frag = document.createDocumentFragment();
+		}
+		if(node.nodeType !== Node.ELEMENT_NODE){
+			return document.createDocumentFragment();
+		}
+		tag = node.nodeName;
+		switch(tag){
+		case "BR": return node.cloneNode(false);
+		case "DIV":
+			frag = document.createDocumentFragment();
+			frag.appendChild(document.createElement('br'));
+			break;
+		case "U": case "B": case "I":
+			frag = document.createElement(tag);
+			break;
+		case "SPAN":
+			frag = document.createElement("span");
+			frag.style.fontFamily = node.style.fontFamily;
+			frag.style.fontSize = node.style.fontSize;
+			break;
+		default:
+			if(node.childNodes.length === 1){
+				return formatHTML(node.firstChild);
 			}
+			frag = document.createDocumentFragment();
 		}
 		[].slice.call(node.childNodes).forEach(function(cnode){
 			var nnode = recFormatHTML(cnode);
@@ -288,20 +292,22 @@
 			return /\^[BIU]/.test(node.textValue)?
 				document.createTextNode(node.textValue.replace(/\^[BIU]|\|/g,"")):
 				node.cloneNode(false);
-		}else if(node.nodeType === Node.ELEMENT_NODE){
-			tag = node.nodeName;
-			outer: switch(tag){
-			case "BR": return node.cloneNode(false);
-			case "U": case "B": case "I":
-				frag = document.createElement(tag);
-				break;
+		}
+		if(node.nodeType !== Node.ELEMENT_NODE){
+			return document.createDocumentFragment();
+		}
+		tag = node.nodeName;
+		switch(tag){
+		case "BR": return node.cloneNode(false);
+		case "U": case "B": case "I":
+			frag = document.createElement(tag);
+			break;
+		default:
+			switch(node.childNodes.length){
+			case 0: return null;
+			case 1: return recFormatHTML(node.firstChild);
 			default:
-				switch(node.childNodes.length){
-				case 0: return null;
-				case 1: return recFormatHTML(node.firstChild);
-				default:
-					frag = document.createDocumentFragment();
-				}
+				frag = document.createDocumentFragment();
 			}
 		}
 		[].slice.call(node.childNodes).forEach(function(cnode){
@@ -318,7 +324,8 @@
 				var tag;
 				if(node.nodeType === Node.TEXT_NODE){
 					return node.nodeValue.replace(/[\r\n]+/g,' ');
-				}else if(node.nodeType !== Node.ELEMENT_NODE){ return ""; }
+				}
+				if(node.nodeType !== Node.ELEMENT_NODE){ return ""; }
 				tag = node.nodeName;
 				switch(tag){
 				case "BR": return "|";
@@ -334,8 +341,7 @@
 	//Turn STL text into the corresponding HTML
 	function STL2HTML(text){
         var DOM = document.createDocumentFragment(),
-			current = DOM,
-			stack = [];
+			current = DOM;
 
 		normTextControls(text)
 			.split(/(\^[BIU]|\|)/g)
@@ -345,7 +351,7 @@
 			if(ttype === "^"){
 				if(token[1] === current.nodeName){ //Closing tag
 					current = current.parentNode;
-				}else{ //Opening tag
+				}else if(/[BIU]/.test(token[1])){ //Opening tag
 					node = document.createElement(token[1]);
 					current.appendChild(node);
 					current = node;
@@ -382,16 +388,16 @@
 			if(setting === settings[k]){ return; }
 			settings[k] = setting;
 			switch(typeof setting){
-			case 'string': lines.push('$'+k+' = '+setting);break;
-			case 'number': lines.push('$'+k+' = '+setting.toString(10));break;
-			case 'boolean': lines.push('$'+k+' = '+(setting?"True":"False"));break;
+			case 'string': lines.push('$'+k+' = '+setting+'\n');break;
+			case 'number': lines.push('$'+k+' = '+setting.toString(10)+'\n');break;
+			case 'boolean': lines.push('$'+k+' = '+(setting?"True\n":"False\n"));break;
 			}
 		});
 
 		//remove leading control codes; they're already handled above
-		return lines.join('\n')
+		return lines.join('')
 			+ STLtime(cue.startTime) + ' , ' + STLtime(cue.endTime) + ' , '
-			+ cue.text.replace(/^(\^[BIU])+/,"");
+			+ cue.text.replace(/^(\^[BIU])+/,"")+'\n';
 	}
 
 	function serialize(track){
@@ -428,7 +434,7 @@
 	function parseNum(v){ return parseInt(v,10); }
 	function parseStr(v){ return v; }
 
-	function parse_timestamp(input){
+	function parseTimestamp(input){
 		var fields = timePat.exec(input);
 		if(!fields){ throw new SyntaxError("Malformed Timestamp"); }
 		return 	parseInt(fields[1],10)*3600 +
@@ -454,7 +460,7 @@
 		);
 		cue.id = id;
 		cueProperties.forEach(function(k){
-			if(setting.hasOwnProperty(k)){ cue[k] = settings[k]; }
+			if(settings.hasOwnProperty(k)){ cue[k] = settings[k]; }
 		});
 		cueList.push(cue);
 	}
@@ -463,8 +469,7 @@
 		var match,line,
 			fields,id=0,
 			settings = {},
-			cueList = [],
-			len = input.length;
+			cueList = [];
 
 		//If the first character is a BYTE ORDER MARK, skip it.
 		linePat.lastIndex = +(input[0] === '\uFEFF');
@@ -478,7 +483,7 @@
 					settings[fields[1]] = commandParsers[fields[1]](fields[2]);
 				}
 			}else if(/\d/.test(line[0])){
-				parseCue(cueList,line,String(++id),settings)
+				parseCue(cueList,line,String(++id),settings);
 			}else if(line.substr(0,2) !== '//'){ //comments
 				throw new SyntaxError("Invalid STL Entry or Command");
 			}
