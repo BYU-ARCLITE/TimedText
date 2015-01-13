@@ -5,7 +5,7 @@
 	if(!TimedText){ throw new Error("TimedText not defined."); }
 
 	var timePat = /(\d\d+):([0-5]\d):([0-5]\d)\.(\d\d)/;
-	var startPat = /^\d\d+:[0-5]\d:[0-5]\d\.\d\d/g;
+	var startPat = /^\d\d+:[0-5]\d:[0-5]\d\.\d\d/mg;
 
 	var SUBCue = TimedText.makeCueType(function(){});
 
@@ -93,7 +93,7 @@
 		cs = Math.floor(100*(time-seconds));
 		return (hh>9?hh:"0"+hh)+":"
 				+(mm>9?mm:"0"+mm)+":"
-				+(ss>9?ss:"0"+ss)+","
+				+(ss>9?ss:"0"+ss)+"."
 				+(cs>9?cs:"0"+cs);
 	}
 
