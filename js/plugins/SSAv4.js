@@ -11,17 +11,17 @@
 	var FontsHeader = /^\[Fonts\]\s*$/;
 	var GraphicsHeader = /^\[Graphics\]\s*$/;
 	var EventLine = /^(Dialogue|Picture):\s*(.*)$/;
-	var TitleLine = /^Title:(.*)$/;
-	var TimerLine = /^Timer:(.*)$/;
-	var SyncLine = /^Sync Point:(.*)$/;
+	var TitleLine = /^Title:\s*(.*)$/;
+	var TimerLine = /^Timer:\s*(.*)$/;
+	var SyncLine = /^Sync Point:\s*(.*)$/;
 	var WrapLine = /^WrapStyle:(.*)$/;
-	var FormatLine = /^Format:(.*)$/;
-	var StyleLine = /^Style:(.*)$/;
-	var FileLine = /^filename:(.*)$/;
+	var FormatLine = /^Format:\s*(.*)$/;
+	var StyleLine = /^Style:\s*(.*)$/;
+	var FileLine = /^filename:\s*(.*)$/;
 
 	//[^;!\s] matches non-whitespace, non-semicolon, non-exclamation;
 	//automatically skips comment lines
-	var linePat = /^(\s*[^;!\s].*?)\s*$/gm;
+	var linePat = /^\s*([^;!\s].*?)\s*$/gm;
 	var timePat = /\s*(\d):([0-5]\d):([0-5]\d)\.(\d\d)\s*/;
 
 	//Maps vextensions to file types for valid embedded file types
@@ -54,7 +54,7 @@
 		this.type = "Dialogue";
 		this.name = "";
 		this.layer = 0;
-		this.style = null;
+		this.style = defaultStyle;
 		this.marginL = 0;
 		this.marginR = 0;
 		this.marginV = 0;
@@ -193,10 +193,10 @@
 				return "Style: "+k+','
 					+style.Fontname+','
 					+style.Fontsize.toString(10)+','
-					+style.PrimaryColour.toSting(10)+','
-					+style.SecondaryColour.toSting(10)+','
-					+style.OutlineColour.toSting(10)+','
-					+style.BackColour.toSting(10)+','
+					+style.PrimaryColour.toString(10)+','
+					+style.SecondaryColour.toString(10)+','
+					+style.OutlineColour.toString(10)+','
+					+style.BackColour.toString(10)+','
 					+(style.Bold?'-1,':'0,')
 					+(style.Italic?'-1,':'0,')
 					+(style.Underline?'-1,':'0,')
@@ -261,9 +261,9 @@
 	//into a SubStation Alpha-format text file
 	function serialize(data){
 		if(!(data instanceof Array)){ data = data.cues; }
-		return "[Script Info]\nTitle:<untitled>\nOriginal Script:<unknown>,ScriptType: v4.00+\nCollisions: Normal\nPlayResY: 1080\nPlayResX: 1920\nPlayDepth: 0\nTimer: 100.0000\nWrapStyle:0\n\n"
-		+serializeStyles(data)
-		+serializeEvents(data)
+		return "[Script Info]\nTitle:<untitled>\nOriginal Script:<unknown>\nScriptType: v4.00+\nCollisions: Normal\nPlayResY: 1080\nPlayResX: 1920\nPlayDepth: 0\nTimer: 100.0000\nWrapStyle: 0\n\n"
+		+serializeStyles(data)+'\n'
+		+serializeEvents(data)+'\n'
 		+serializeGraphics(data);
 	}
 
@@ -429,7 +429,7 @@
 		flist = match[1].split(/\s*,\s*/g);
 		globals.fieldNum = flist.length;
 		flist.forEach(function(field, index){
-			globals.eventFormat[field] = index;
+			globals.format[field] = index;
 		});
 		return parseEvents;
 	}
@@ -482,7 +482,7 @@
 		if(!match){ throw new SyntaxError("Missing Style Format Line"); }
 
 		match[1].split(/\s*,\s*/g).forEach(function(field, index){
-			globals.styleFormat[field] = index;
+			globals.format[field] = index;
 		});
 		return parseStyles;
 	}
