@@ -59,16 +59,30 @@ TimedText = (function(){
 		return mime_types[assert_support(mime)].cueType;
 	}
 
+	function getNodeText(node){
+		return Array.prototype.map.call(
+			node.childNodes,
+			function(n){
+				if(n.nodeType === Node.TEXT_NODE){ return n.nodeValue; }
+				if(n.nodeType !== Node.ELEMENT_NODE){ return ''; }
+				if(n.nodeName === 'BR'){ return '\n'; }
+				if(n.nodeName === 'DIV'){ return '\n'+getNodeText(n); }
+			}
+		).join('');
+	}
+
 	function getPlainText(cue){
-		return cue.getCueAsHTML().textContent;
+		return getNodeText(cue.getCueAsHTML());
 	}
 
 	function defaultConverter(cue){
-		return new this(cue.startTime, cue.endTime, getPlainText(cue));
+		var ncue = new this(cue.startTime, cue.endTime, getPlainText(cue));
+		ncue.id = cue.id;
+		return ncue;
 	}
 
 	function getCueConverter(from, to){
-		var toType, converters, toConstructor;
+		var toType, converters;
 		from = assert_support(from);
 		toType = mime_types[assert_support(to)];
 		converters = toType.converters;
