@@ -55,6 +55,7 @@
 		this.name = "";
 		this.layer = 0;
 		this.style = defaultStyle;
+		this.alignment = 0;
 		this.marginL = 0;
 		this.marginR = 0;
 		this.marginV = 0;
@@ -62,50 +63,276 @@
 		this.data = null;
 	});
 
-	//doesn't handle all the modes, because the VTT rendering rules subsume some of them
-	//for now, eliminate all styling; later, implement our own rendering rules
-	//to handle SubStation override codes
-	function processCueText(text, mode){
-		//replace with actual ASS text processing algorithm
-		var dom = document.createDocumentFragment(),
-			el = document.createElement('span'),
-			newText = text.replace(/\\n|\\N|\\h|(\{\\.*?\})|[<>]/g, function(match){
-				switch(match){
-				case '\\n': return mode === 1?' ':'<br/>';
-				case '\\N': return '<br data-hard=1/>';
-				case '\\h': return '&nbsp;';
-				case '<': return '&lt;';
-				case '>': return '&gt;';
-				default: return '';
+	/*Supported tags:
+		\i	italic
+		\b	bold
+		\u	underline
+		\s	strikeout
+		\fn<font name>
+		\fs<font size>
+		\c&H<bbggrr>&	sets text color. <bbggrr> is a hexadecimal value. Leading zeroes are not required.
+		\1c&Hbbggrr&	synonym for \c
+		\4c&Hbbggrr&	sets background color
+	Unsupported tags:
+		\2c, \3c	sets secondary and outline colors
+		\1a, \2a, \3a, \4a	sets alpha channels; difficult to translate to CSS separately from color
+		\alpha Don't know what the proper syntax is supposed to be
+		\2c, \3c
+		\bord<width>	border
+		\shad<depth>	shadow
+		\be		blur edges
+		\fsc<x or y><percent>	scales x or y dimension
+		\fsp<pixels>	changes the distance between letters.
+		\fr[<x/y/z>]<degrees> sets the rotation angle around the x/y/z axis.
+		\fr defaults to \frz.
+		\fe<charset>	<charset> is a number specifying the character set. No idea what the valid codes are.
+	*/
+
+	function match_tag(tag, control){
+		//check if the given tag is of the type
+		//that would be created by the given control code
+		switch(control){
+		case 'i': case 'u': case 'b':
+			return tag.nodeName.toLowerCase() === tag;
+		case 's':
+			return tag.nodeName === "SPAN" && tag.style.textDecoration === "line-through";
+		case 'fn':
+			return tag.nodeName === "SPAN" && !!tag.style.fontFamily;
+		case 'fs':
+			return tag.nodeName === "SPAN" && !!tag.style.fontSize;
+		case 'c': case '1c':
+			return tag.nodeName === "SPAN" && !!tag.style.color;
+		case '4c':
+			return tag.nodeName === "SPAN" && !!tag.style.background;
+		default:
+			return false;
+		}
+	}
+
+	function bgr2rgb(value){
+		var i = parseInt(value,16),
+			r = (i&0xFF), g = ((i>>8)&0xFF), b = ((i>>16)&0xFF);
+		return "#"+(r===0?"00":(r<0x10?"0"+r:r))
+				+(g===0?"00":(g<0x10?"0"+g:g))
+				+(b===0?"00":(b<0x10?"0"+b:b));
+	}
+
+	//Create the appropriate tag type given a particular control code
+	//and control value, add it to the DOM structure, and return the
+	//new current node.
+	function append_tag(current, control, value){
+		var el;
+		switch(control){
+		case 'i': case 'b': case 'u':
+			el = document.createElement(control);
+			break;
+		case 's':
+			el = document.createElement("span");
+			el.style.textDecoration = "line-through";
+			break;
+		case 'fn':
+			el = document.createElement("span");
+			el.style.fontFamily = value;
+			break;
+		case 'fs':
+			el = document.createElement("span");
+			el.style.fontSize = value+"pt";
+			break;
+		case 'c': case '1c':
+			el = document.createElement("span");
+			el.style.color = bgr2rgb(value);
+			break;
+		case '4c':
+			el = document.createElement("span");
+			el.style.background = bgr2rgb(value);
+			break;
+		default:
+			return current;
+		}
+		current.appendChild(el);
+		return el;
+	}
+
+	function close_tag(current, control){
+		var tmp, stack = [];
+		//keep track of all open tags embedded within the one we're closing
+		while(!match_tag(current, control)){
+			stack.push(current);
+			current = current.parentNode;
+			if(!current){ return stack[0]; }
+		}
+		//re-open all of the embedded tags
+		while(stack.length){
+			tmp = stack.pop().cloneNode(false)
+			current.appendChild(tmp);
+			current = tmp;
+		}
+		return current;
+	}
+
+	function add_karaoke(current, cs){
+		//Add a timestamp node for karaoke text
+		var node = document.createElement('i');
+		node.dataset.target = "timestamp";
+		node.dataset.seconds = cs/100;
+		current.appendChild(node);
+	}
+
+	function processTextNodes(text, mode){
+		var DOM = document.createDocumentFragment();
+		text.split(/(\\n|\\N|\\h)/g)
+			.filter(function(token){ return token !== ""; })
+			.map(function(token){
+				var el;
+				switch(token){
+				case '\\n': return mode === 1?
+					document.createTextNode(' '):
+					document.createElement('br');
+				case '\\N':
+					el = document.createElement('br');
+					el.dataset.hard = 1;
+					return el;
+				case '\\h': return document.createTextNode('&nbsp;');
+				default: return document.createTextNode(token);
 				}
-			});
-		el.innerHTML = newText;
-		[].slice.call(el.childNodes).forEach(dom.appendChild.bind(dom));
-		return dom;
+			}).forEach(DOM.appendChild.bind(DOM));
+		return DOM;
+	}
+
+	function processCueText(text, style, wrapStyle){
+		var DOM = document.createElement('span'),
+			current = DOM,
+			align = 0, k = 0,
+			overrides = {
+				i: style.Italic,
+				b: style.Bold,
+				u: style.Underline,
+				s: style.Strikeout,
+				fs: style.Fontsize,
+				fn: style.Fontname
+			};
+
+		//strip trailing tags, for efficiency
+		text = text.replace(/(\{\\.*?\})+$/,"");
+
+		//Closure helper functions
+		function check_binary_code(token, control, value){
+			var tmp, set = (parseInt(value,10) !== 0);
+			if(value === overrides[control]){ return; }
+			overrides[control] = set;
+			current = set?//opening tag
+				(match_tag(current.lastChild, control)?
+					current.lastChild: //merge adjacent tags
+					append_tag(current, control, value)):
+				close_tag(current, control);
+		}
+
+		function check_code(token, control, value){
+			if(value === overrides[control]){ return; }
+			overrides[control] = value;
+			current = close_tag(current, control);
+			current = append_tag(current, control, value);
+		}
+
+		//Set up initial structure based on style defaults
+		//TODO: figure out how to collapse spans
+		current = append_tag(current, 'fs', style.Fontsize);
+		current = append_tag(current, 'fn', style.Fontname);
+		if(style.Italic){ current = append_tag(current, 'i'); }
+		if(style.Bold){ current = append_tag(current, 'b'); }
+		if(style.Underline){ current = append_tag(current, 'u'); }
+		if(style.Strikeout){ current = append_tag(current, 's'); }
+
+		//Text actually gets processed here.
+		text.split(/(\{\\.*?\})/).forEach(function(token){
+			var match;
+
+			if(token === ""){ return; }
+
+			//Regular text node
+			if(!/^\{\\/.test(token)){
+				current.appendChild(processTextNodes(token, wrapStyle));
+				return;
+			}
+
+			//Binary on/off controls
+			match = /\{\\([iubs])(\d+)\}/.exec(token);
+			if(match){
+				check_binary_code(token, match[1], match[2]);
+				return;
+			}
+
+			//Karaoke tags
+			match = /\{\\[kK][fo]?(\d+)\}/.exec(token);
+			if(match){
+				if(k > 0){ add_karaoke(current, k); }
+				k += parseInt(match[1],10);
+				return;
+			}
+
+			//Wrapping style
+			match = /\{\\q(\d+)\}/.exec(token);
+			if(match){
+				wrapStyle = parseInt(match[1],10) % 4;
+				return;
+			}
+
+			//Style reset
+			match = /\{\\r(.*?)\}/.exec(token);
+			if(match){
+				//Unimplemented
+				return;
+			}
+
+			//Color settings & all other non-binary controls
+			//Alignment settings were already handled in text sanitization
+			match = /\{\\(\d*[ca]+)&H([0-9A-F]+)&\}/.exec(token)
+				||	/\{\\([a-z]+)(\d+)\}/.exec(token);
+			if(match){
+				check_code(token, match[1], match[2]);
+				return;
+			}
+		});
+		return DOM.childNodes.length === 1?DOM.firstChild:DOM;
 	}
 
 	ASSCue.prototype.getCueAsHTML = function(){
 		if(!this.DOM){
-			this.DOM = processCueText(this.text, this.wrapStyle);
+			this.DOM = processCueText(this.text, this.style, this.wrapStyle);
 		}
 		return this.DOM.cloneNode(true);
 	};
-	
+
+	var alignMap = [0,1,2,3,0,7,8,9,0,4,5,6];
 	ASSCue.prototype.sanitizeText = function(t){
-		return t.replace(/\r?\n/g,'\\N');
+		var match;
+		if(match = /\{\\(an?)(\d*)\}/.exec(t)){ //old-style alignment codes
+			this.alignment = match[1] === 'a'?
+				alignMap[match[2]]||0: //old-style alignment codes
+				Math.max(parseInt(match[1],10),0)%10;
+			t = t.replace(/\{\\an?\d*\}/g,'');
+		}
+		return t.replace(/\r?\n|&nbsp;|&lt;|&gt;/g,function(m){
+			switch(m){
+			case '&nbsp;': return '\\h';
+			case '&lt;': return '<';
+			case '&gt;': return '>';
+			default: return '\\N';
+			}
+		});
 	};
 
 	/**Editor Interaction Functions **/
 
-	//For now, remove all formatting
-	//Later, figure out how to translate to SubStation overrides.
-	//http://docs.aegisub.org/3.1/ASS_Tags/
 	function formatHTML(node){
 		if(node.parentNode === null){ return null; }
 		if(node.nodeType === Node.TEXT_NODE){ return node; }
 		return document.createTextNode(node.textContent);
 	}
 
+	//For now, remove all formatting
+	//Later, figure out how to translate to SubStation overrides.
+	//http://docs.aegisub.org/3.1/ASS_Tags/
 	function HTML2SSA(node){ return node.textContent; }
 
 	/** Serialization Functions **/
