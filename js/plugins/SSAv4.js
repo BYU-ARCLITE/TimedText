@@ -112,9 +112,17 @@
 	function bgr2rgb(value){
 		var i = parseInt(value,16),
 			r = (i&0xFF), g = ((i>>8)&0xFF), b = ((i>>16)&0xFF);
-		return "#"+(r===0?"00":(r<0x10?"0"+r:r))
-				+(g===0?"00":(g<0x10?"0"+g:g))
-				+(b===0?"00":(b<0x10?"0"+b:b));
+		return "#"+	(r===0?"00":(r<0x10?"0"+r:r)) +
+					(g===0?"00":(g<0x10?"0"+g:g)) +
+					(b===0?"00":(b<0x10?"0"+b:b));
+	}
+
+	function rgb2bgr(value){
+		var i = parseInt(value.substr(1),16),
+			b = (i&0xFF), g = ((i>>8)&0xFF), r = ((i>>16)&0xFF);
+		return	(b===0?"00":(b<0x10?"0"+b:b)) +
+				(g===0?"00":(g<0x10?"0"+g:g)) +
+				(r===0?"00":(r<0x10?"0"+r:r));
 	}
 
 	//Create the appropriate tag type given a particular control code
@@ -124,9 +132,11 @@
 		var el;
 		switch(control){
 		case 'i': case 'b': case 'u':
+			if(!value){ return current; }
 			el = document.createElement(control);
 			break;
 		case 's':
+			if(!value){ return current; }
 			el = document.createElement("span");
 			el.style.textDecoration = "line-through";
 			break;
@@ -199,18 +209,46 @@
 		return DOM;
 	}
 
+	function collapseSpans(root){
+		var child;
+		while(root.nodeType === Node.ELEMENT_NODE && root.tagName === "SPAN"){
+			if(	root.children.length === 1 &&
+				root.childNodes.length === 1 &&
+				root.firstChild.tagName === "SPAN"	){
+
+				child = root.firstChild;
+				if(child.style.textDecoration){ root.style.textDecoration = child.style.textDecoration; }
+				if(child.style.fontFamily){ root.style.fontFamily = child.style.fontFamily; }
+				if(child.style.fontSize){ root.style.fontSize = child.style.fontSize; }
+				if(child.style.color){ root.style.color = child.style.color; }
+				if(child.style.background){ root.style.background = child.style.background; }
+
+				[].forEach.call(child.childNodes,function(node){
+					if(	node.nodeType === Node.ELEMENT_NODE &&
+						node.childNodes.length === 0 &&
+						node.nodeName !== "BR"	){ return; }
+					root.appendChild(node);
+				});
+				root.removeChild(child);
+			}else{
+				[].forEach.call(root.childNodes,collapseSpans);
+				return;
+			}
+		}
+	}
+
 	function processCueText(text, style, wrapStyle){
 		var DOM = document.createElement('span'),
 			current = DOM,
 			align = 0, k = 0,
-			overrides = {
+			defaults = { //map style defaults to override tags
 				i: style.Italic,
 				b: style.Bold,
 				u: style.Underline,
 				s: style.Strikeout,
 				fs: style.Fontsize,
 				fn: style.Fontname
-			};
+			}, overrides = Object.create(defaults);
 
 		//strip trailing tags, for efficiency
 		text = text.replace(/(\{\\.*?\})+$/,"");
@@ -235,13 +273,9 @@
 		}
 
 		//Set up initial structure based on style defaults
-		//TODO: figure out how to collapse spans
-		current = append_tag(current, 'fs', style.Fontsize);
-		current = append_tag(current, 'fn', style.Fontname);
-		if(style.Italic){ current = append_tag(current, 'i'); }
-		if(style.Bold){ current = append_tag(current, 'b'); }
-		if(style.Underline){ current = append_tag(current, 'u'); }
-		if(style.Strikeout){ current = append_tag(current, 's'); }
+		Object.keys(defaults).forEach(function(tag){
+			current = append_tag(current, tag, defaults[tag]);
+		});
 
 		//Text actually gets processed here.
 		text.split(/(\{\\.*?\})/).forEach(function(token){
@@ -280,7 +314,16 @@
 			//Style reset
 			match = /\{\\r(.*?)\}/.exec(token);
 			if(match){
-				//Unimplemented
+				Object.keys(defaults).forEach(function(tag){
+					current = append_tag(current, tag, defaults[tag]);
+				});
+				return;
+			}
+
+			//Font name
+			match = /\{\\fn(.+?)\}/.exec(token);
+			if(match){
+				check_code(token, 'fn', match[1].trim());
 				return;
 			}
 
@@ -293,7 +336,9 @@
 				return;
 			}
 		});
-		return DOM.childNodes.length === 1?DOM.firstChild:DOM;
+
+		collapseSpans(DOM);
+		return DOM;
 	}
 
 	ASSCue.prototype.getCueAsHTML = function(){
@@ -325,15 +370,69 @@
 	/**Editor Interaction Functions **/
 
 	function formatHTML(node){
-		if(node.parentNode === null){ return null; }
+		var el; //TODO: Ensure that there are no nested tags of the same type
 		if(node.nodeType === Node.TEXT_NODE){ return node; }
-		return document.createTextNode(node.textContent);
+		if(node.nodeType !== Node.ELEMENT_NODE){ return document.createDocumentFragment(); }
+		switch(node.nodeName){
+		case 'I': case 'B': case 'U': case 'BR':
+			return node;
+		default:
+			if(node.childNodes.length === 0){ return document.createDocumentFragment(); }
+			el = document.createElement("span");
+
+			if(node.style.textDecoration === "line-through"){ el.style.textDecoration = "line-through"; }
+			if(node.style.fontFamily){ el.style.fontFamily = node.style.fontFamily; }
+			if(node.style.fontSize){ el.style.fontSize = node.style.fontSize; }
+			if(node.style.color){ el.style.color = node.style.color; }
+			if(node.style.background){ el.style.background = node.style.background; }
+			
+			[].forEach.call(node.childNodes,function(child){
+				el.appendChild(formatHTML(child));
+			});
+			return collapseSpans(el);
+		}
 	}
 
 	//For now, remove all formatting
-	//Later, figure out how to translate to SubStation overrides.
 	//http://docs.aegisub.org/3.1/ASS_Tags/
-	function HTML2SSA(node){ return node.textContent; }
+	function HTML2SSA(node){
+		HTML2SSArecur(formatHTML(node));
+	}
+
+	function HTML2SSArecur(node){
+		var txt;
+		switch(node.nodeType){
+		case Node.TEXT_NODE:
+			return node.nodeValue.replace(/\r?\n|&nbsp;|&lt;|&gt;/g,function(m){
+				switch(m){
+				case '&nbsp;': return '\\h';
+				case '&lt;': return '<';
+				case '&gt;': return '>';
+				default: return '\\n';
+				}
+			});
+		case Node.DOCUMENT_FRAGMENT_NODE:
+			return [].map.call(node.childNodes,HTML2SSArecur).join('');
+		case Node.ELEMENT_NODE:
+			switch(node.nodeName){
+			case 'I': return '{\\i}'+HTML2SSArecur(node)+'{\\i}';
+			case 'B': return '{\\b}'+HTML2SSArecur(node)+'{\\b}';
+			case 'B': return '{\\u}'+HTML2SSArecur(node)+'{\\u}';
+			case 'BR': return '\\N';
+			case 'SPAN':
+				txt = [].map.call(node.childNodes,HTML2SSArecur).join('');
+				if(node.style.textDecoration === "line-through"){ txt = '{\\s}'+txt+'{\\s}'; }
+				if(node.style.fontFamily){ txt = '{\\fn'+node.style.fontFamily+'}'+txt; }
+				//get rid of units by converting to a number and back again
+				if(node.style.fontSize){ txt = '{\\fs'+parseInt(node.style.fontSize,10)+'}'+txt; }
+				if(node.style.color){ txt = '{\\1c'+rgb2bgr(node.style.color)+'}'+txt; }
+				if(node.style.background){ txt = '{\\4c'+rgb2bgr(node.style.background)+'}'+txt; }
+				return txt;
+			default: return '';
+			}
+		default: return '';
+		}
+	}
 
 	/** Serialization Functions **/
 
