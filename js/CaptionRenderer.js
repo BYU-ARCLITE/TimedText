@@ -1,4 +1,4 @@
-(function(TimedText) {
+(function(TimedText){
 	"use strict";
 
 	if(!TimedText){ throw new Error("TimedText not defined."); }
@@ -10,14 +10,14 @@
 			height: The calculated height of the display
 			width: The calculated width of the display
 	*/
-	function getDisplayMetrics(renderer) {
+	function getDisplayMetrics(renderer){
 		var UA, offsetObject = renderer.target,
 			nodeComputedStyle = window.getComputedStyle(offsetObject,null),
 			offsetTop = 0, offsetLeft = 0, controlHeight = 0;
 
-		if (typeof renderer.controlHeight === 'number'){
+		if(typeof renderer.controlHeight === 'number'){
 			controlHeight = renderer.controlHeight;
-		}else if (offsetObject.hasAttribute("controls")) {
+		}else if(offsetObject.hasAttribute("controls")){
 			// Get heights of default control strip in various browsers
 			// There could be a way to measure this live but I haven't thought/heard of it yet...
 			UA = navigator.userAgent.toLowerCase();
@@ -58,7 +58,7 @@
 		First parameter: DOMNode to style
 		Second parameter: An object where the keys are camel-cased CSS property names
 	*/
-	function applyStyles(Node, styleObject) {
+	function applyStyles(Node, styleObject){
 		var style = Node.style;
 		Object.keys(styleObject).forEach(function(styleName){
 			style[styleName] = styleObject[styleName];
@@ -68,7 +68,7 @@
 	/* styleCueContainer(renderer)
 		Styles and positions a div for displaying cues on a video.
 	*/
-	function styleCueContainer(renderer,videoMetrics) {
+	function styleCueContainer(renderer,videoMetrics){
 		var baseFontSize = Math.max(((videoMetrics.height * renderer.fontSizeRatio)/96)*72,renderer.minFontSize),
 			baseLineHeight = Math.max(Math.floor(baseFontSize * renderer.lineHeightRatio),renderer.minLineHeight),
 			styles = {
@@ -86,23 +86,10 @@
 		}
 	}
 
-	function defaultPosCue(rendered, availableCueArea, videoMetrics) {
+	function defaultPosCue(rendered, availableCueArea, videoMetrics){
 		var DOMNode = rendered.node,
 			cueObject = rendered.cue,
-			cueX = 0, cueY = 0, cueWidth = 0, cueHeight = 0,
-			baseFontSize, basePixelFontSize, baseLineHeight, pixelLineHeight;
-
-		// Calculate font metrics
-		baseFontSize = Math.max(((videoMetrics.height * 0.045)/96)*72, 10);
-		basePixelFontSize = Math.floor((baseFontSize/72)*96);
-		baseLineHeight = Math.max(Math.floor(baseFontSize * 1.2), 14);
-		pixelLineHeight = Math.ceil((baseLineHeight/72)*96);
-
-		if (pixelLineHeight * Math.floor(videoMetrics.height / pixelLineHeight) < videoMetrics.height) {
-			pixelLineHeight = Math.floor(videoMetrics.height / Math.floor(videoMetrics.height / pixelLineHeight));
-			baseLineHeight = Math.ceil((pixelLineHeight/96)*72);
-		}
-
+			cueX = 0, cueY = 0, cueWidth = 0, cueHeight = 0;
 
 		cueWidth = availableCueArea.width;
 		cueX = ((availableCueArea.right - cueWidth)/2) + availableCueArea.left;
@@ -112,17 +99,17 @@
 			position: "absolute",
 			unicodeBidi: "plaintext",
 			overflow: "hidden",
-			height: pixelLineHeight + "px", //so the scrollheight has a baseline to work from
+			height: "1px", //so the scrollheight has a baseline to work from
 			width: cueWidth + "px",
 			left: cueX + "px",
 			padding: "0px " + Math.floor(videoMetrics.width/100) + "px",
 			textAlign: "center",
 			direction: TimedText.getTextDirection(DOMNode.textContent),
-			lineHeight: baseLineHeight + "pt",
+			lineHeight: "normal", //override anything that might otherwise be inherited
 			boxSizing: "border-box"
 		});
 
-		cueHeight = Math.round(DOMNode.scrollHeight/pixelLineHeight)*pixelLineHeight;
+		cueHeight = DOMNode.scrollHeight;
 		cueY = availableCueArea.height + availableCueArea.top - cueHeight;
 		DOMNode.style.height = cueHeight + "px";
 		DOMNode.style.top = cueY + "px";
@@ -130,11 +117,11 @@
 		// Work out how to shrink the available render area
 		// If subtracting from the bottom works out to a larger area, subtract from the bottom.
 		// Otherwise, subtract from the top.
-		if ((cueY - 2*availableCueArea.top) >=
+		if((cueY - 2*availableCueArea.top) >=
 			(availableCueArea.bottom - (cueY + cueHeight)) &&
-			availableCueArea.bottom > cueY) {
+			availableCueArea.bottom > cueY){
 			availableCueArea.bottom = cueY;
-		} else if (availableCueArea.top < cueY + cueHeight) {
+		} else if(availableCueArea.top < cueY + cueHeight){
 			availableCueArea.top = cueY + cueHeight;
 		}
 		availableCueArea.height = availableCueArea.bottom - availableCueArea.top;
@@ -146,7 +133,7 @@
 			properties = rendered.properties;
 
 		for(prop in cue){
-			if(!cue.hasOwnProperty(prop)) { continue; }
+			if(!cue.hasOwnProperty(prop)){ continue; }
 			if(properties[prop] !== cue[prop]){
 				properties[prop] = cue[prop];
 				dirty = true;
@@ -256,7 +243,7 @@
 
 	/* CaptionRenderer([options - JS Object])
 	*/
-	function CaptionRenderer(options) {
+	function CaptionRenderer(options){
 		if(!(this instanceof CaptionRenderer)){ return new CaptionRenderer(options); }
 		options = options instanceof Object? options : {};
 		var media, renderer = this, internalTime = 0,
@@ -290,7 +277,7 @@
 		this.renderedCues = [];
 
 		window.addEventListener("resize", this.refreshLayout.bind(this) ,false);
-		this.bindMediaElement = function(element) {
+		this.bindMediaElement = function(element){
 			if(media && typeof media.removeEventListener === 'function'){ media.removeEventListener('timeupdate',timeupdate,false); }
 			media = element;
 			if(media){
@@ -334,8 +321,8 @@
 				set: function(time){
 					internalTime = +time || 0;
 					// update active cues
-					try{ this.tracks.forEach(function(track) { track.currentTime = internalTime; }); }
-					catch(ignore) {}
+					try{ this.tracks.forEach(function(track){ track.currentTime = internalTime; }); }
+					catch(ignore){}
 					this.rebuildCaptions(false);
 				},
 				enumerable: true
@@ -377,7 +364,7 @@
 		});
 	}
 
-	CaptionRenderer.prototype.addTextTrack = function(kind,label,language) {
+	CaptionRenderer.prototype.addTextTrack = function(kind,label,language){
 		var newTrack;
 		if(kind instanceof TextTrack){
 			newTrack = kind;
@@ -388,7 +375,7 @@
 			typeof language === "string" ? language : "");
 			newTrack.readyState = TextTrack.LOADED;
 		}
-		if (newTrack) {
+		if(newTrack){
 			this.tracks.push(newTrack);
 			newTrack.renderer = this;
 			return newTrack;
@@ -396,21 +383,21 @@
 		return null;
 	};
 
-	CaptionRenderer.prototype.removeTextTrack = function(track) {
+	CaptionRenderer.prototype.removeTextTrack = function(track){
 		var i = this.tracks.indexOf(track);
 		if(i !== -1){ this.tracks.splice(i,1); }
 	};
 
 	function collectCues(tracks, fn){
 		var activeCues = [];
-		tracks.forEach(function(track) {
+		tracks.forEach(function(track){
 			if(track.mode === "disabled" || track.readyState !== TextTrack.LOADED){ return; }
 			[].push.apply(activeCues,[].map.call(track.activeCues,fn.bind(null,track)));
 		});
 		return activeCues;
 	}
 
-	CaptionRenderer.prototype.rebuildCaptions = function(force) {
+	CaptionRenderer.prototype.rebuildCaptions = function(force){
 		var renderer = this,
 			container = this.container,
 			descriptor = this.descriptor,
@@ -536,7 +523,7 @@
 		}
 	};
 
-	CaptionRenderer.prototype.refreshLayout = function() {
+	CaptionRenderer.prototype.refreshLayout = function(){
 		if(!this.target){ return; }
 		var renderer = this, area,
 			container = this.container,
@@ -556,7 +543,7 @@
 		descriptor.style.opacity = 0;
 		styleCueContainer(this,videoMetrics);
 
-		this.renderedCues.forEach(function(rendered) {
+		this.renderedCues.forEach(function(rendered){
 			rendered.updateTime(currentTime);
 			rendered.updateContent();
 			rendered.positionCue(area,videoMetrics);
@@ -570,7 +557,7 @@
 	/* processVideoElement(videoElement <HTMLVideoElement>,
 						[options - JS Object])
 	*/
-	CaptionRenderer.prototype.processVideoElement = function(videoElement,options) {
+	CaptionRenderer.prototype.processVideoElement = function(videoElement,options){
 		options = options instanceof Object? options : {};
 		var renderer = this,
 			trackList = this.tracks,
@@ -580,7 +567,7 @@
 
 		if(elements.length === 0){ return; }
 
-		elements.forEach(function(trackElement) {
+		elements.forEach(function(trackElement){
 			var trackEnabled = false,
 				sources = trackElement.querySelectorAll("source"),
 				trackObject = new TextTrack(
@@ -599,8 +586,8 @@
 				// in the media element's list of text tracks with a text track kind of either subtitles or captions whose text track mode is showing
 				// ---> Let the text track mode be showing.
 				case "subtitles":
-				case "captions": if(options.enableCaptionsByDefault && defaultLanguage === trackObject.language) {
-					trackEnabled = !trackList.some(function(track) {
+				case "captions": if(options.enableCaptionsByDefault && defaultLanguage === trackObject.language){
+					trackEnabled = !trackList.some(function(track){
 						return	(track.kind === "captions" || track.kind === "subtitles") &&
 								defaultLanguage === trackObject.language &&
 								trackObject.mode === "showing";
@@ -610,8 +597,8 @@
 				// appropriate for the user, and there is no other text track in the media element's list of text tracks with a text track
 				// kind of chapters whose text track mode is showing
 				// ---> Let the text track mode be showing.
-				case "chapters": if (defaultLanguage === trackObject.language) {
-					trackEnabled = !trackList.filter(function(track) {
+				case "chapters": if(defaultLanguage === trackObject.language){
+					trackEnabled = !trackList.filter(function(track){
 						return track.kind === "chapters" && track.mode === "showing";
 					});
 				}break;
@@ -619,8 +606,8 @@
 				// with this text track language and text track label enabled, and there is no other text track in the media element's
 				// list of text tracks with a text track kind of descriptions whose text track mode is showing
 				// ---> Let the text track mode be showing.
-				case "descriptions": if(options.enableDescriptionsByDefault && defaultLanguage === trackObject.language) {
-					trackEnabled = !trackList.filter(function(track) {
+				case "descriptions": if(options.enableDescriptionsByDefault && defaultLanguage === trackObject.language){
+					trackEnabled = !trackList.filter(function(track){
 						return track.kind === "descriptions" && track.mode === "showing";
 					});
 				}
@@ -628,8 +615,8 @@
 
 			// If there is a text track in the media element's list of text tracks whose text track mode is showing by default,
 			// the user agent must furthermore change that text track's text track mode to hidden.
-			trackEnabled && trackList.forEach(function(track) {
-				if(track.internalDefault && trackObject.mode === "showing") {
+			trackEnabled && trackList.forEach(function(track){
+				if(track.internalDefault && trackObject.mode === "showing"){
 					trackObject.mode = "hidden";
 				}
 			});
@@ -637,7 +624,7 @@
 			// If the track element has a default attribute specified, and there is no other text track in the media element's
 			// list of text tracks whose text track mode is showing or showing by default
 			// Let the text track mode be showing by default.
-			trackEnabled |= trackObject.internalDefault && !trackList.some(function(track) {
+			trackEnabled |= trackObject.internalDefault && !trackList.some(function(track){
 				return track.mode === "showing";
 			});
 
