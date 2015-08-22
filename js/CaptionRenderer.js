@@ -375,7 +375,7 @@
 			typeof language === "string" ? language : "");
 			newTrack.readyState = TextTrack.LOADED;
 		}
-		if(newTrack){
+		if(newTrack && this.tracks.indexOf(newTrack) === -1){
 			this.tracks.push(newTrack);
 			newTrack.renderer = this;
 			return newTrack;
@@ -385,7 +385,8 @@
 
 	CaptionRenderer.prototype.removeTextTrack = function(track){
 		var i = this.tracks.indexOf(track);
-		if(i !== -1){ this.tracks.splice(i,1); }
+		if(i !== -1){ return this.tracks.splice(i,1)[0]; }
+		return null;
 	};
 
 	function collectCues(tracks, fn){
@@ -470,29 +471,30 @@
 			activeCues.forEach(function(rendered){
 				var node, kind = rendered.kind;
 
-				if(rendered.dirty){
-					renderCue(rendered,area,
-						function(){ defaultRenderCue(rendered,area); });
-					rendered.done = true;
-					rendered.dirty = false;
-					node = rendered.node;
+				if(!rendered.dirty){ return; }
+				renderCue(rendered,area,
+					function(){ defaultRenderCue(rendered,area); });
+				rendered.done = true;
+				rendered.dirty = false;
+				node = rendered.node;
 
-					if(node === null){ return; }
+				if(node === null){ return; }
 
-					if(!node.hasAttribute('lang')){
-						node.setAttribute('lang',rendered.language);
-					}
+				if(!node.hasAttribute('lang')){
+					node.setAttribute('lang',rendered.language);
+				}
 
-					rendered.updateTime(currentTime);
+				if(rendered.mode !== "showing" || node === null){ return; }
 
-					if(rendered.mode === "showing" && node.parentNode === null){
-						if(kind === 'descriptions'){
-							descriptor.appendChild(node);
-						}else if(kind !== "chapters" && kind !== "metadata"){
-							container.appendChild(node);
-						}
-					}
-				}else if(rendered.node === null){ return; }
+				rendered.updateTime(currentTime);
+
+				if(node.parentNode === null){
+					if(kind === 'descriptions'){
+						descriptor.appendChild(node);
+					}else if(kind !== "chapters" && kind !== "metadata"){
+						container.appendChild(node);
+					}else{ return; }
+				}
 
 				rendered.positionCue(area,videoMetrics);
 			});
