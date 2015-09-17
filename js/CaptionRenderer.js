@@ -44,7 +44,7 @@
 		};
 	}
 
-	function defaultRenderCue(renderedCue,area){
+	function defaultRenderCue(renderedCue){
 		var node, kind = renderedCue.kind;
 		if(renderedCue.dirty){ renderedCue.cleanup(); }
 		if(kind === "chapters" || kind === "metadata"){ return; }
@@ -274,7 +274,7 @@
 		this.container = container;
 		this.descriptor = descriptor;
 		this.tracks = [];
-		this.renderedCues = [];
+		this.renderedCues = new Map();
 
 		window.addEventListener("resize", this.refreshLayout.bind(this) ,false);
 		this.bindMediaElement = function(element){
@@ -390,72 +390,21 @@
 	};
 
 	function collectCues(tracks, fn){
-		var activeCues = [];
+		var activeCues = new Map();
 		tracks.forEach(function(track){
 			if(track.mode === "disabled" || track.readyState !== TextTrack.LOADED){ return; }
-			[].push.apply(activeCues,[].map.call(track.activeCues,fn.bind(null,track)));
+			track.activeCues.forEach(function(cue){
+				activeCues.set(cue, fn(track, cue));
+			});
 		});
 		return activeCues;
 	}
 
-	CaptionRenderer.prototype.rebuildCaptions = function(force){
-		var renderer = this,
-			container = this.container,
-			descriptor = this.descriptor,
-			currentTime = this.currentTime,
-			renderedCues = this.renderedCues,
-			renderCue = this.renderCue,
-			posBit = false, dirtyBit = force,
-			area, activeCues, videoMetrics;
-
-		if(force){
-			//force re-render no matter what
-			renderedCues.forEach(function(rendered){
-				var node = rendered.node;
-				if(node && node.parentNode){ node.parentNode.removeChild(node); }
-			});
-			activeCues = collectCues(this.tracks, function(track, cue){
-				return new RenderedCue(renderer,cue,track);
-			});
-		}else{
-			//find out if any cues are different
-			activeCues = collectCues(this.tracks, function(track, cue){
-				var i, cached;
-				for(i=0;cached = renderer.renderedCues[i];i++){
-					if(cached.cue === cue){
-						dirtyBit = dirtyBit || cached.updateContent();
-						if(!dirtyBit){
-							posBit = posBit || cached.updateTime(currentTime);
-						}
-						return cached;
-					}
-				}
-				dirtyBit = true;
-				return new RenderedCue(renderer,cue,track);
-			});
-
-			renderedCues.forEach(function(old){
-				//check for lapse to inactive status
-				if(activeCues.some(function(rendered){ return rendered.cue === old.cue; })){ return; }
-				posBit = true;
-
-				old.cleanup();
-				if(old.cue.pauseOnExit && this.media && typeof this.media.pause === 'function'){
-					this.media.pause();
-				}
-			});
-		}
-
-		if(!this.target){ return; }
-
-		// If needed, redraw
-		if(dirtyBit){
-			container.style.opacity = 0;
-			descriptor.style.opacity = 0;
-
-			videoMetrics = getDisplayMetrics(this);
-			styleCueContainer(this,videoMetrics);
-
+	function calcLayout(renderer){
+		if(!renderer.target){ return; }
+		var container = renderer.container,
+			descriptor = renderer.descriptor,
+			videoMetrics = getDisplayMetrics(renderer),
 			// Define storage for the available cue area, diminished as further cues are added
 			// Cues occupy the largest possible area they can, either by width or height
 			// (depending on whether the 'direction' of the cue is vertical or horizontal)
@@ -468,12 +417,82 @@
 				"width": videoMetrics.width
 			};
 
+		// Get the canvas ready
+		styleCueContainer(renderer,videoMetrics);
+
+		renderer.renderedCues.forEach(function(rendered){
+			rendered.positionCue(area,videoMetrics);
+		});
+
+		container.style.opacity = 1;
+		if(renderer.showDescriptions){
+			descriptor.style.opacity = 1;
+		}
+	};
+
+	CaptionRenderer.prototype.rebuildCaptions = function(dirtyBit){
+		var renderer = this,
+			container = this.container,
+			descriptor = this.descriptor,
+			currentTime = this.currentTime,
+			renderedCues = this.renderedCues,
+			renderCue = this.renderCue,
+			posBit = false, pauseBit = false,
+			activeCues;
+
+		if(dirtyBit){
+			//force re-render no matter what
+			container.style.opacity = 0;
+			descriptor.style.opacity = 0;
+
+			//remove all rendered cues from the page
+			container.innerHTML = "";
+			descriptor.innerHTML = "";
+			activeCues = collectCues(this.tracks, function(track, cue){
+				renderedCues.delete(cue);
+				return new RenderedCue(renderer,cue,track);
+			});
+		}else{
+			//find out if any cues are different
+			activeCues = collectCues(this.tracks, function(track, cue){
+				var cached = renderedCues.get(cue);
+				renderedCues.delete(cue);
+
+				if(cached === void 0){ // this is a new cue
+					dirtyBit = true;
+					return new RenderedCue(renderer,cue,track);
+				}
+
+				// this is an old cue- check if contents have changed or it needs repositioning
+				dirtyBit = dirtyBit || cached.updateContent();
+				posBit = posBit || cached.updateTime(currentTime);
+				return cached;
+			});
+		}
+
+		renderedCues.forEach(function(old){ // anything left has gone inactive
+			posBit = true;
+			pauseBit = pauseBit || old.cue.pauseOnExit
+			old.cleanup();
+		});
+
+		if(pauseBit) try { this.media.pause(); }catch(_){}
+
+		renderedCues = activeCues;
+		this.renderedCues = renderedCues;
+
+		if(!this.target){ return; }
+
+		// If needed, redraw
+		if(dirtyBit){
+			container.style.opacity = 0;
+			descriptor.style.opacity = 0;
+
 			activeCues.forEach(function(rendered){
 				var node, kind = rendered.kind;
 
 				if(!rendered.dirty){ return; }
-				renderCue(rendered,area,
-					function(){ defaultRenderCue(rendered,area); });
+				renderCue(rendered, defaultRenderCue.bind(null,rendered));
 				rendered.done = true;
 				rendered.dirty = false;
 				node = rendered.node;
@@ -488,72 +507,30 @@
 
 				rendered.updateTime(currentTime);
 
-				if(node.parentNode === null){
-					if(kind === 'descriptions'){
-						descriptor.appendChild(node);
-					}else if(kind !== "chapters" && kind !== "metadata"){
-						container.appendChild(node);
-					}else{ return; }
+				if(node.parentNode !== null){ return; }
+				if(kind === 'descriptions'){
+					descriptor.appendChild(node);
+				}else if(kind !== "chapters" && kind !== "metadata"){
+					container.appendChild(node);
 				}
-
-				rendered.positionCue(area,videoMetrics);
-			});
-		}else if(posBit){
-			//just reposition things, in case the karaoke styling altered metrics or something disappeared
-			container.style.opacity = 0;
-			descriptor.style.opacity = 0;
-
-			videoMetrics = getDisplayMetrics(this);
-			styleCueContainer(this,videoMetrics);
-
-			area = {
-				"top": 0, "left": 0,
-				"bottom": videoMetrics.height,
-				"right": videoMetrics.width,
-				"height": videoMetrics.height,
-				"width": videoMetrics.width
-			};
-			renderedCues.forEach(function(rendered){
-				rendered.positionCue(area,videoMetrics);
 			});
 		}
 
-		this.renderedCues = activeCues;
-		container.style.opacity = 1;
-		if(this.showDescriptions){
-			descriptor.style.opacity = 1;
-		}
+		if(dirtyBit || posBit){ calcLayout(this); }
 	};
 
 	CaptionRenderer.prototype.refreshLayout = function(){
 		if(!this.target){ return; }
-		var renderer = this, area,
-			container = this.container,
-			descriptor = this.descriptor,
-			currentTime = this.currentTime,
-			videoMetrics = getDisplayMetrics(renderer),
-			area = {
-				"top": 0, "left": 0,
-				"bottom": videoMetrics.height,
-				"right": videoMetrics.width,
-				"height": videoMetrics.height,
-				"width": videoMetrics.width
-			};
-
-		// Get the canvas ready
-		container.style.opacity = 0;
-		descriptor.style.opacity = 0;
-		styleCueContainer(this,videoMetrics);
+		var currentTime = this.currentTime;
+		this.container.style.opacity = 0;
+		this.descriptor.style.opacity = 0;
 
 		this.renderedCues.forEach(function(rendered){
 			rendered.updateTime(currentTime);
 			rendered.updateContent();
-			rendered.positionCue(area,videoMetrics);
 		});
-		container.style.opacity = 1;
-		if(this.showDescriptions){
-			descriptor.style.opacity = 1;
-		}
+
+		calcLayout(this);
 	};
 
 	/* processVideoElement(videoElement <HTMLVideoElement>,
