@@ -214,33 +214,42 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 		return frag;
 	}
 
-	function HTML2VTT(parent){
-		return [].map.call(parent.childNodes,function(node){
-			var tag;
-			if(node.nodeType === Node.TEXT_NODE){ return node.nodeValue.replace(/[\r\n]+/g,' '); }
-			if(node.nodeType !== Node.ELEMENT_NODE){ return ""; }
+	function HTML2VTT(node){
+		return [].map.call(node.childNodes, HTML2VTTr)
+			.join('') //replace ensures no blank lines are exported
+			.replace(/(\r\n){2,}/g,'\r\n');
+	}
+
+	function HTML2VTTr(node){
+		var tag, innertxt;
+		if(node.nodeType === Node.TEXT_NODE){
+			return node.nodeValue.replace(/[\r\n]+/g,' ');
+		}
+
+		innertxt = [].map.call(node.childNodes, HTML2VTTr).join('');
+		if(node.nodeType === Node.ELEMENT_NODE){
 			tag = node.nodeName;
 			switch(tag){
 			case "BR": return "\r\n";
-			case "DIV": return "\r\n"+HTML2VTT(node);
+			case "DIV": return "\r\n"+innertxt;
 			case "I":
 				return (node["data-target"] === "timestamp")
 						?node["data-timestamp"]
-						:("<i>"+HTML2VTT(node)+"</i>");
-			default:
-				return HTML2VTT(node);
+						:("<i>"+innertxt+"</i>");
 			case "U": case "B": case "RUBY": case "RT":
 				tag = tag.toLowerCase();
-				return "<"+tag+">"+HTML2VTT(node)+"</"+tag+">";
+				return "<"+tag+">"+innertxt+"</"+tag+">";
 			case "SPAN":
 				switch(node['data-cuetag']){
-				case "V": return "<v "+node['data-voice']+">"+HTML2VTT(node)+"</v>";
-				case "C": return "<c."+node.className.replace(/ /g,'.')+">"+HTML2VTT(node)+"</c>";
-				case "LANG": return "<lang "+node.lang+">"+HTML2VTT(node)+"</lang>";
-				default: return HTML2VTT(node); //ignore unrecognized tags
+				case "V": return "<v "+node['data-voice']+">"+innertxt+"</v>";
+				case "C": return "<c."+node.className.replace(/ /g,'.')+">"+innertxt+"</c>";
+				case "LANG": return "<lang "+node.lang+">"+innertxt+"</lang>";
 				}
 			}
-		}).join('');
+		}
+
+		//ignore unrecognized tags & node types
+		return innertxt;
 	}
 
 	//var WebVTTDEFAULTSCueParser		= /^DEFAULTS?\s+\-\-\>\s+(.*)/g;

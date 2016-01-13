@@ -389,20 +389,16 @@
 			[].forEach.call(node.childNodes,function(child){
 				el.appendChild(formatHTML(child));
 			});
-			return collapseSpans(el);
+			collapseSpans(el);
+			return el;
 		}
 	}
 
-	//For now, remove all formatting
 	//http://docs.aegisub.org/3.1/ASS_Tags/
 	function HTML2SSA(node){
-		HTML2SSArecur(formatHTML(node));
-	}
-
-	function HTML2SSArecur(node){
 		var txt;
-		switch(node.nodeType){
-		case Node.TEXT_NODE:
+
+		if(node.nodeType === Node.TEXT_NODE){
 			return node.nodeValue.replace(/\r?\n|&nbsp;|&lt;|&gt;/g,function(m){
 				switch(m){
 				case '&nbsp;': return '\\h';
@@ -411,16 +407,16 @@
 				default: return '\\n';
 				}
 			});
-		case Node.DOCUMENT_FRAGMENT_NODE:
-			return [].map.call(node.childNodes,HTML2SSArecur).join('');
-		case Node.ELEMENT_NODE:
+		}
+
+		txt = [].map.call(node.childNodes, HTML2SSA).join('');
+		if(node.nodeType === Node.ELEMENT_NODE){
 			switch(node.nodeName){
-			case 'I': return '{\\i}'+HTML2SSArecur(node)+'{\\i}';
-			case 'B': return '{\\b}'+HTML2SSArecur(node)+'{\\b}';
-			case 'B': return '{\\u}'+HTML2SSArecur(node)+'{\\u}';
 			case 'BR': return '\\N';
+			case 'I': return '{\\i}'+txt+'{\\i}';
+			case 'B': return '{\\b}'+txt+'{\\b}';
+			case 'U': return '{\\u}'+txt+'{\\u}';
 			case 'SPAN':
-				txt = [].map.call(node.childNodes,HTML2SSArecur).join('');
 				if(node.style.textDecoration === "line-through"){ txt = '{\\s}'+txt+'{\\s}'; }
 				if(node.style.fontFamily){ txt = '{\\fn'+node.style.fontFamily+'}'+txt; }
 				//get rid of units by converting to a number and back again
@@ -428,10 +424,13 @@
 				if(node.style.color){ txt = '{\\1c'+rgb2bgr(node.style.color)+'}'+txt; }
 				if(node.style.background){ txt = '{\\4c'+rgb2bgr(node.style.background)+'}'+txt; }
 				return txt;
-			default: return '';
 			}
-		default: return '';
 		}
+
+		//strip trailing tags
+		txt = txt.replace(/(\{\\.*?\})+$/,"");
+
+		return txt;
 	}
 
 	/** Serialization Functions **/

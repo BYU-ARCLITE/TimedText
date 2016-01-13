@@ -113,22 +113,32 @@
 		return frag;
 	}
 
-	function HTML2SRT(parent){
-		return [].map.call(parent.childNodes,function(node){
-			var tag;
-			if(node.nodeType === Node.TEXT_NODE){ return node.nodeValue.replace(/[\r\n]+/g,' '); }
-			if(node.nodeType !== Node.ELEMENT_NODE){ return ""; }
+	function HTML2SRT(node){
+		return [].map.call(node.childNodes, HTML2SRTr)
+			.join('') //replace ensures no blank lines are exported
+			.replace(/(\r\n){2,}/g,'\r\n');
+	}
+
+	function HTML2SRTr(node){
+		var tag, innertxt;
+		if(node.nodeType === Node.TEXT_NODE){
+			return node.nodeValue.replace(/[\r\n]+/g,' ');
+		}
+
+		innertxt = [].map.call(node.childNodes, HTML2SRTr).join('');
+
+		if(node.nodeType === Node.ELEMENT_NODE){
 			tag = node.nodeName;
 			switch(tag){
 			case "BR": return "\r\n";
-			case "DIV": return "\r\n"+HTML2SRT(node);
+			case "DIV": return "\r\n"+innertxt;
 			case "I": case "U": case "B":
-				return "<"+tag+">"+HTML2SRT(node)+"</"+tag+">";
-			default:
-				return HTML2SRT(node);
+				return "<"+tag+">"+innertxt+"</"+tag+">";
 			}
-		})	.join('') //replace ensures no blank lines are exported
-			.replace(/(\r\n){2,}/g,'\r\n');
+		}
+
+		//ignore unrecognized tags & node types
+		return innertxt;	
 	}
 
 	function SRTtime(time){
