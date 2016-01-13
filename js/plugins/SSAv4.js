@@ -223,7 +223,7 @@
 				if(child.style.color){ root.style.color = child.style.color; }
 				if(child.style.background){ root.style.background = child.style.background; }
 
-				[].forEach.call(child.childNodes,function(node){
+				[].slice.call(child.childNodes).forEach(function(node){
 					if(	node.nodeType === Node.ELEMENT_NODE &&
 						node.childNodes.length === 0 &&
 						node.nodeName !== "BR"	){ return; }
@@ -371,7 +371,7 @@
 
 	function formatHTML(node){
 		var el; //TODO: Ensure that there are no nested tags of the same type
-		if(node.nodeType === Node.TEXT_NODE){ return node; }
+		if(node.nodeType === Node.TEXT_NODE){ return node.cloneNode(false); }
 		if(node.nodeType !== Node.ELEMENT_NODE){ return document.createDocumentFragment(); }
 		switch(node.nodeName){
 		case 'I': case 'B': case 'U': case 'BR':
@@ -396,41 +396,99 @@
 
 	//http://docs.aegisub.org/3.1/ASS_Tags/
 	function HTML2SSA(node){
-		var txt;
+		var el = node.cloneNode(true);
+		collapseSpans(el);
+		return HTML2SSAr(el, {});
+	}
+
+	function HTML2SSAm(node, tags){
+		return [].map.call(node.childNodes, function(n){
+			return HTML2SSAr(n, tags);
+		}).join('');
+	}
+
+	function HTML2SSAr(node, tags){
+		var ntags, pretags, posttags;
 
 		if(node.nodeType === Node.TEXT_NODE){
-			return node.nodeValue.replace(/\r?\n|&nbsp;|&lt;|&gt;/g,function(m){
+			return node.nodeValue.replace(/[\r\n]+|&nbsp;|&lt;|&gt;/g,function(m){
 				switch(m){
 				case '&nbsp;': return '\\h';
 				case '&lt;': return '<';
 				case '&gt;': return '>';
-				default: return '\\n';
+				//don't replace actual line breaks with newline escapes,
+				//because line breaks in HTML text are actually meaningless
+				default: return ' ';
 				}
 			});
 		}
 
-		txt = [].map.call(node.childNodes, HTML2SSA).join('');
 		if(node.nodeType === Node.ELEMENT_NODE){
 			switch(node.nodeName){
 			case 'BR': return '\\N';
-			case 'I': return '{\\i}'+txt+'{\\i}';
-			case 'B': return '{\\b}'+txt+'{\\b}';
-			case 'U': return '{\\u}'+txt+'{\\u}';
+			case 'I':
+				if(tags.i){ return HTML2SSAm(node, tags); }
+				ntags = Object.create(tags,{i: {value: true}});
+				return '{\\i}'+HTML2SSAm(node, ntags)+'{\\i}';			
+			case 'B':
+				if(tags.b){ return HTML2SSAm(node, tags); }
+				ntags = Object.create(tags,{b: {value: true}});
+				return '{\\b}'+HTML2SSAm(node, ntags)+'{\\b}';	
+			case 'U':
+				if(tags.u){ return HTML2SSAm(node, tags); }
+				ntags = Object.create(tags,{u: {value: true}});
+				return '{\\u}'+HTML2SSAm(node, ntags)+'{\\u}';	
 			case 'SPAN':
-				if(node.style.textDecoration === "line-through"){ txt = '{\\s}'+txt+'{\\s}'; }
-				if(node.style.fontFamily){ txt = '{\\fn'+node.style.fontFamily+'}'+txt; }
-				//get rid of units by converting to a number and back again
-				if(node.style.fontSize){ txt = '{\\fs'+parseInt(node.style.fontSize,10)+'}'+txt; }
-				if(node.style.color){ txt = '{\\1c'+rgb2bgr(node.style.color)+'}'+txt; }
-				if(node.style.background){ txt = '{\\4c'+rgb2bgr(node.style.background)+'}'+txt; }
-				return txt;
+				pretags = "";
+				posttags = "";
+				ntags = Object.create(tags);
+
+				if(node.style.textDecoration === "line-through"){
+					ntags.s = true;
+					if(!tags.s){
+						pretags += "{\\s}";
+						posttags += "{\\s}";
+					}
+				}
+
+				if(node.style.fontFamily){
+					ntags.fn = node.style.fontFamily;
+					if(ntags.fn !== tags.fn){
+						pretags += '{\\fn'+ntags.fn+'}';
+						if(tags.fn){ posttags += '{\\fn'+tags.fn+'}'; }
+					}
+				}
+
+				if(node.style.fontSize){
+					ntags.fs = TimedText.convertUnits(node.style.fontSize,'pt',1);
+					if(ntags.fs !== tags.fs){
+						pretags += '{\\fs'+ntags.fs+'}';
+						if(tags.fs){ posttags += '{\\fs'+tags.fs+'}'; }
+					}
+				}
+
+				if(node.style.color){
+					ntags.tc = rgb2bgr(node.style.color);
+					if(ntags.tc !== tags.tc){
+						pretags += '{\\1c'+ntags.tc+'}';
+						if(tags.tc){ posttags += '{\\1c'+tags.tc+'}'; }
+					}
+				}
+
+				if(node.style.background){
+					ntags.bc = rgb2bgr(node.style.background);
+					if(ntags.bc !== tags.bc){
+						pretags += '{\\4c'+ntags.bc+'}';
+						if(tags.bc){ posttags += '{\\1c'+tags.bc+'}'; }
+					}
+				}
+
+				return pretags+HTML2SSAm(node, ntags)+posttags;
 			}
 		}
 
-		//strip trailing tags
-		txt = txt.replace(/(\{\\.*?\})+$/,"");
-
-		return txt;
+		// ignore unrecognized tags
+		return HTML2SSAm(node, tags);
 	}
 
 	/** Serialization Functions **/
