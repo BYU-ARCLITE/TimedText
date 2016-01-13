@@ -238,7 +238,6 @@ TextTrackCueList.prototype.removeCue = function(cue) {
 
 function ActiveTextTrackCueList(textTrackCueList,textTrack) {
 	this.refreshCues = function() {
-		if (!textTrackCueList.length) { return; }
 		var i, j, cue,
 			cueListChanged = false;
 			

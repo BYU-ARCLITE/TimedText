@@ -394,6 +394,8 @@
 		tracks.forEach(function(track){
 			if(track.mode === "disabled" || track.readyState !== TextTrack.LOADED){ return; }
 			track.activeCues.forEach(function(cue){
+				//sanity check, in case a refresh didn't occur
+				if(!cue.active){ return; }
 				activeCues.set(cue, fn(track, cue));
 			});
 		});
