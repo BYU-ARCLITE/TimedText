@@ -236,17 +236,22 @@ TextTrackCueList.prototype.removeCue = function(cue) {
 	}
 };
 
-function ActiveTextTrackCueList(textTrackCueList,textTrack) {
-	this.refreshCues = function() {
-		var i, j, cue,
+function ActiveTextTrackCueList(textTrackCueList,textTrack){
+	this.refreshCues = function(){
+		var i, j, cue, endTime = 1/0,
 			cueListChanged = false;
 			
 		for(i = 0, j = 0; cue = textTrackCueList[i]; i++){
-			if (cue.active) {
-				cueListChanged |= cue !== this[j];
-				this[j++] = cue;
-			} else if(j > 0){
+			if(j > 0 && cue.startTime > endTime){
+				// If we've seen at least one active cue,
+				// and this cue starts after some active
+				// cue ends, then there can be no more
+				// active cues in the ordered list
 				break;
+			}else if(cue.active){
+				cueListChanged |= cue !== this[j];
+				endTime = Math.min(endTime,cue.endTime);
+				this[j++] = cue;
 			}
 		}
 
