@@ -134,24 +134,24 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 				if(chunk = token.match(/<(\d{2})?:?(\d{2}):(\d{2})[\.\,](\d+)/)){
 					current.appendChild(createTimestampNode(chunk));
 					return;
-				}else if(chunk = token.match(/<v\s+([^>]+)>/i)){
+				}else if(chunk = token.match(/<c((?:\.[^\t\n\r &<>.])*)>/i)){
 					node = document.createElement('span');
-					node.title = node.dataset.voice = chunk[1].replace(/[\"]/g,"");
-					node.dataset.cuetag = "V";
-				}else if(token.match(/<c[a-z0-9\-\_\.]+>/i)){
-					node = document.createElement('span');
-					node.className = token.replace(/[<\/>\s]+/ig,"")
-										.split(/[\.]+/ig)
-										.slice(1)
-										.filter(hasRealTextContent).join(' ');
+					node.className = chunk[1].replace('.',' ').substr(1);
 					node.dataset.cuetag = "C";
-				}else if(chunk = token.match(/<lang\s+([^>]+)>/i)){
+				}else if(chunk = token.match(/<v((?:\.[^\t\n\r &<>.])*)\s+([^>]+)>/i)){
 					node = document.createElement('span');
+					node.className = chunk[1].replace('.',' ').substr(1);
+					node.title = node.dataset.voice = chunk[2].replace(/[\"]/g,"");
+					node.dataset.cuetag = "V";
+				}else if(chunk = token.match(/<lang((?:\.[^\t\n\r &<>.])*)\s+([^>]+)>/i)){
+					node = document.createElement('span');
+					node.className = chunk[1].replace('.',' ').substr(1);
 					node.dataset.cuetag = "LANG";
 					stack.push(lang);
-					lang = chunk[1];
-				}else if(chunk = token.match(/<(b|i|u|ruby|rt)>/)){
+					lang = chunk[2];
+				}else if(chunk = token.match(/<(b|i|u|ruby|rt)((?:\.[^\t\n\r &<>.])*)\s*>/)){
 					node = document.createElement(chunk[1]);
+					node.className = chunk[2].replace('.',' ').substr(1);
 				}else{
 					return;
 				}
@@ -172,7 +172,7 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 
 	//strip out any html that could not have been generated from VTT
 	function formatHTML(node){
-		var tag, frag;
+		var tag, frag, parent;
 		if(node.nodeType === Node.TEXT_NODE){ return node; }
 		if(node.nodeType === Node.ELEMENT_NODE){
 			tag = node.nodeName;
@@ -181,35 +181,53 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 			case "DIV":
 				frag = document.createDocumentFragment();
 				frag.appendChild(document.createElement('br'));
+				if(node.className.length === 0){
+					parent = frag;
+				}else{
+					parent = document.createElement(span);
+					parent.className = node.className;
+					frag.appendChild(parent);
+				}
 				break;
 			case "I":
-				frag = node.cloneNode(false);
+				parent = frag = node.cloneNode(false);
+				parent.className = node.className;
 				break;
 			case "U": case "B": case "RUBY": case "RT":
-				frag = document.createElement(tag);
+				parent = frag = document.createElement(tag);
+				parent.className = node.className;
 				break;
 			case "SPAN":
 				switch(node['data-cuetag']){
 				case "V": case "C": case "LANG":
-					frag = document.createElement(tag);
+					parent = frag = document.createElement(tag);
 					frag["data-cuetag"] = node["data-cuetag"];
+					parent.className = node.className;
 					break outer;
 				}
 			default:
 				//this is where invalid tags are dropped
 				if(node.childNodes.length === 1){
-					return formatHTML(node.firstChild);
+					frag = formatHTML(node.firstChild);
+					if(node.className.length === 0){ return frag; }
+					
+					parent = document.createElement('span');
+					parent.className = node.className;
+					parent.appendChild(frag);
+					return parent;
 				}
-				frag = document.createDocumentFragment();
+
+				parent = frag = document.createDocumentFragment();
+				break;
 			}
 		}
 		[].slice.call(node.childNodes).forEach(function(cnode){
 			var nnode = formatHTML(cnode);
 			if( //drop repeated BRs- blank lines not allowed
-				frag.lastChild === null ||
-				frag.lastChild.nodeName !== 'BR' ||
+				parent.lastChild === null ||
+				parent.lastChild.nodeName !== 'BR' ||
 				nnode.nodeName !== 'BR'
-			){ frag.appendChild(nnode); }
+			){ parent.appendChild(nnode); }
 		});
 		return frag;
 	}
@@ -221,12 +239,17 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 	}
 
 	function HTML2VTTr(node){
-		var tag, innertxt;
+		var tag, innertxt,
+			classtext = "";
 		if(node.nodeType === Node.TEXT_NODE){
 			return node.nodeValue.replace(/[\r\n]+/g,' ');
 		}
 
 		innertxt = [].map.call(node.childNodes, HTML2VTTr).join('');
+		if(node.className.length > 0){
+			classtext = "." + node.className.trim().replace(/\s+/g,'.')
+		}
+
 		if(node.nodeType === Node.ELEMENT_NODE){
 			tag = node.nodeName;
 			switch(tag){
@@ -235,15 +258,15 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 			case "I":
 				return (node["data-target"] === "timestamp")
 						?node["data-timestamp"]
-						:("<i>"+innertxt+"</i>");
+						:("<i"+classtext+">"+innertxt+"</i>");
 			case "U": case "B": case "RUBY": case "RT":
 				tag = tag.toLowerCase();
-				return "<"+tag+">"+innertxt+"</"+tag+">";
+				return "<"+tag+classtext+">"+innertxt+"</"+tag+">";
 			case "SPAN":
 				switch(node['data-cuetag']){
-				case "V": return "<v "+node['data-voice']+">"+innertxt+"</v>";
-				case "C": return "<c."+node.className.replace(/ /g,'.')+">"+innertxt+"</c>";
-				case "LANG": return "<lang "+node.lang+">"+innertxt+"</lang>";
+				case "V": return "<v"+classtext+" "+node['data-voice']+">"+innertxt+"</v>";
+				case "C": return "<c"+classtext+">"+innertxt+"</c>";
+				case "LANG": return "<lang"+classtext+" "+node.lang+">"+innertxt+"</lang>";
 				}
 			}
 		}
