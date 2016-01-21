@@ -298,9 +298,10 @@
 		var DOMNode = rendered.node,
 			cueObject = rendered.cue,
 			cueX = 0, cueY = 0, cueWidth = 0, cueHeight = 0,
-			baseFontSize, basePixelFontSize, baseLineHeight, pixelLineHeight;
+			baseFontSize, basePixelFontSize, pixelLineHeight,
+			px2pt = TimedText.unitRatio("px","pt");
 
-		baseFontSize = Math.max(((videoMetrics.height * 0.045)/96)*72, 10);
+		baseFontSize = Math.max(videoMetrics.height * 0.05 * px2pt, 10);
 
 		if(typeof cueObject.x1 === 'number'){
 			applyStyles(DOMNode,{
@@ -314,22 +315,20 @@
 				padding: Math.floor(videoMetrics.height/100) + "px 0px",
 				textAlign: "center",
 				direction: TimedText.getTextDirection(""+cueObject.text),
-				fontSize: baseFontSize,
+				fontSize: baseFontSize + "pt",
 				boxSizing: "border-box"
 			});
 			while(DOMNode.scrollHeight > DOMNode.offsetHeight){
 				baseFontSize = Math.floor(2 * baseFontSize * DOMNode.offsetHeight / DOMNode.scrollHeight)/2;
-				DOMNode.fontSize = baseFontSize + "px";
+				DOMNode.fontSize = baseFontSize + "pt";
 			}
 		}else{
 			// Calculate font metrics
-			basePixelFontSize = Math.floor((baseFontSize/72)*96);
-			baseLineHeight = Math.max(Math.floor(baseFontSize * 1.2), 14);
-			pixelLineHeight = Math.ceil((baseLineHeight/72)*96);
+			basePixelFontSize = Math.floor(baseFontSize/px2pt);
+			pixelLineHeight = Math.ceil(baseFontSize * 1.3/px2pt);
 
 			if(pixelLineHeight * Math.floor(videoMetrics.height / pixelLineHeight) < videoMetrics.height){
 				pixelLineHeight = Math.floor(videoMetrics.height / Math.floor(videoMetrics.height / pixelLineHeight));
-				baseLineHeight = Math.ceil((pixelLineHeight/96)*72);
 			}
 
 			cueWidth = availableCueArea.width;
@@ -346,7 +345,8 @@
 				padding: "0px " + Math.floor(videoMetrics.width/100) + "px",
 				textAlign: "center",
 				direction: TimedText.getTextDirection(DOMNode.textContent),
-				lineHeight: baseLineHeight + "pt",
+				fontSize: baseFontSize + "pt",
+				lineHeight: "1.3",
 				boxSizing: "border-box"
 			});
 

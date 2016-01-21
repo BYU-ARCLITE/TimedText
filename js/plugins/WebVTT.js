@@ -524,19 +524,18 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 				cueObject = rendered.cue,
 				cueX = 0, cueY = 0, cueWidth = 0, cueHeight = 0, cuePaddingLR = 0, cuePaddingTB = 0,
 				cueSize, cueLine, cueVertical = cueObject.vertical, cueSnap = cueObject.snapToLines, cuePosition = cueObject.position,
-				baseFontSize, basePixelFontSize, baseLineHeight,
-				pixelLineHeight, verticalPixelLineHeight;
+				baseFontSize, basePixelFontSize,
+				pixelLineHeight, verticalPixelLineHeight,
+				px2pt = TimedText.unitRatio("px","pt");
 
 			// Calculate font metrics
-			baseFontSize = Math.max(((videoMetrics.height * 0.045)/96)*72, 10);
-			basePixelFontSize = Math.floor((baseFontSize/72)*96);
-			baseLineHeight = Math.max(Math.floor(baseFontSize * 1.2), 14);
-			pixelLineHeight = Math.ceil((baseLineHeight/72)*96);
+			baseFontSize = Math.max(videoMetrics.height * 0.05 * px2pt, 10);
+			basePixelFontSize = Math.floor(baseFontSize/px2pt);
+			pixelLineHeight = Math.ceil(baseFontSize * 1.3/px2pt);
 			verticalPixelLineHeight	= pixelLineHeight;
 
 			if(pixelLineHeight * Math.floor(videoMetrics.height / pixelLineHeight) < videoMetrics.height){
 				pixelLineHeight = Math.floor(videoMetrics.height / Math.floor(videoMetrics.height / pixelLineHeight));
-				baseLineHeight = Math.ceil((pixelLineHeight/96)*72);
 			}
 
 			if(pixelLineHeight * Math.floor(videoMetrics.width / pixelLineHeight) < videoMetrics.width){
@@ -560,7 +559,8 @@ http://www.whatwg.org/specs/web-apps/current-work/webvtt.html
 				padding: cuePaddingTB + "px " + cuePaddingLR + "px",
 				textAlign: (cueVertical !== "")?"":(cueObject.align === "middle"?"center":cueObject.align),
 				direction: TimedText.getTextDirection(DOMNode.textContent),
-				lineHeight: baseLineHeight + "pt",
+				fontSize: baseFontSize + "pt",
+				lineHeight: "1.3",
 				boxSizing: "border-box"
 			});
 

@@ -23,6 +23,32 @@ TimedText = (function(){
 		return text.substring(0,i).search(l_exp) >= 0 ? 'ltr' : 'rtl';
 	}
 
+	function unitRatio(u1, u2) {
+		var u1px, u2px, res;
+
+		if(u1 === u2){ return 1; }
+
+		document.body.appendChild(d);
+		if(u2 === 'px'){
+			d.style.width = "1"+u1;
+			res = parseFloat(getComputedStyle(d).width);
+		}else if(u1 === 'px'){
+			d.style.width = "1"+u2;
+			res = 1 / parseFloat(getComputedStyle(d).width);
+		}else{
+			d.style.width = "1"+units;
+			u1px = parseFloat(getComputedStyle(d).width);
+
+			d.style.width = "1"+target;
+			u2px = parseFloat(getComputedStyle(d).width);
+
+			res = u1ps/u2px;
+		}	
+
+		document.body.removeChild(d);
+		return res;
+	}
+
 	function convertUnits(value, target, prec) {
 		var upx, tpx, res, mul,
 			parts = value.trim().match(/(\d+\.?\d+)(.*)/),
@@ -200,6 +226,7 @@ TimedText = (function(){
 		getPlainText: getPlainText,
 		getTextDirection: getTextDirection,
 		convertUnits: convertUnits,
+		unitRatio: unitRatio,
 		isSupported: function(mime){ return mime_types.hasOwnProperty(strip_mime(mime)); },
 		isCueEditable: isCueEditable,
 		isTypeEditable: isTypeEditable,
