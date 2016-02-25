@@ -1,7 +1,7 @@
 /*
 http://www.w3.org/TR/ttaf1-dfxp/
 */
-(function(){
+(function(TimedText){
 	"use strict";
 
 	if(!TimedText){ throw new Error("TimedText not defined."); }
@@ -23,6 +23,58 @@ http://www.w3.org/TR/ttaf1-dfxp/
 		return this.DOM.cloneNode(true);
 	};
 
+	//strip out any html that could not have been generated from TTML
+	function formatHTML(node){
+		var tag, frag;
+		if(node.nodeType === Node.TEXT_NODE){ return node; }
+		if(node.nodeType === Node.ELEMENT_NODE){
+			tag = node.nodeName;
+			switch(tag){
+			case "BR": return node.cloneNode(false);
+			case "DIV":
+				frag = document.createDocumentFragment();
+				frag.appendChild(document.createElement('br'));
+				break;
+			default:
+				//this is where invalid tags are dropped
+				if(node.childNodes.length === 1){
+					return formatHTML(node.firstChild);
+				}
+				frag = document.createDocumentFragment();
+			}
+		}
+		[].slice.call(node.childNodes).forEach(function(cnode){
+			frag.appendChild(formatHTML(cnode));
+		});
+		return frag;
+	}
+
+	function HTML2TTML(node){
+		return [].map.call(node.childNodes, HTML2TTMLr)
+			.join('') //collapse blank lines
+			.replace(/(\r\n){2,}/g,'\r\n');
+	}
+
+	function HTML2TTMLr(node){
+		var tag, innertxt;
+		if(node.nodeType === Node.TEXT_NODE){
+			return node.nodeValue;
+		}
+
+		innertxt = [].map.call(node.childNodes, HTML2TTMLr).join('');
+
+		if(node.nodeType === Node.ELEMENT_NODE){
+			tag = node.nodeName;
+			switch(tag){
+			case "BR": return "<br/>\r\n";
+			case "DIV": return "<br/>\r\n"+innertxt;
+			}
+		}
+
+		//ignore unrecognized tags & node types
+		return innertxt;	
+	}
+	
 	function XMLEncode(s) {
 		return s.replace(/\&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r\n|(\r[^\n])|([^\r]\n)/g, "<br/>");
 	}
@@ -183,8 +235,8 @@ http://www.w3.org/TR/ttaf1-dfxp/
 		name: 'TTML',
 		cueType: TTMLCue,
 		isCueCompatible: function(cue){ return cue instanceof TTMLCue; },
-		formatHTML: null,
-		textFromHTML: null,
+		formatHTML: formatHTML,
+		textFromHTML: HTML2TTML,
 		positionCue: null,
 		updateCueTime: null,
 		updateCueContent: null,
@@ -192,4 +244,4 @@ http://www.w3.org/TR/ttaf1-dfxp/
 		parse: parse,
 		serialize: serialize
 	});
-}());
+}(window.TimedText));
